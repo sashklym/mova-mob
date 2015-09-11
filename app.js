@@ -58496,8 +58496,9 @@ Ext.define('App.config.Locale', {
 Ext.define('App.model.User', {
     extend: 'Ext.data.Model',
     config: {
+        identifier: 'uuid',
         fields: [
-            'id',
+            'userId',
             'name',
             'score',
             'email',
@@ -58505,7 +58506,7 @@ Ext.define('App.model.User', {
             'reminder',
             'reminderTime',
             'openTime',
-            'sessionid',
+            'sessionId',
             'photo'
         ]
     }
@@ -58661,15 +58662,15 @@ Ext.define('App.controller.Main', {
             Ext.Msg.defaultAllowedConfig.showAnimation = false;
             Ext.Msg.defaultAllowedConfig.hideAnimation = false;
         }
+        // DEBUG: Prevent redirect to login after page refresh
+        if (window.location.hash.length > 1)  {
+            return;
+        }
+
         var user = Ext.getStore('Users').getAt(0);
-        if (user && user.get('name') && user.get('sessionid')) {
+        if (user && user.get('name') && user.get('sessionId')) {
             this.redirectTo('home');
         } else {
-            this.redirectTo('login');
-        }
-        //this.redirectTo('home');
-        // Go Home
-        if (window.location.hash == '') {
             this.redirectTo('login');
         }
     },
@@ -58680,7 +58681,7 @@ Ext.define('App.controller.Main', {
         var user = Ext.getStore('Users').getAt(0);
         var UserData = {
                 username: user.get('name'),
-                sessionid: user.get('sessionid')
+                sessionid: user.get('sessionId')
             };
         leftMenu.down('#leftMenuInfoUser').setData({
             name: user.get('name'),
@@ -58766,6 +58767,26 @@ Ext.define('App.view.Login', {
                 cls: 'verify',
                 action: 'fbbutton',
                 text: 'Увійти через FB'
+            },
+            {
+                xtype: 'spacer'
+            },
+            {
+                xtype: 'button',
+                ui: 'action',
+                cls: 'verify',
+                action: 'gbutton',
+                text: 'Увійти через Google'
+            },
+            {
+                xtype: 'spacer'
+            },
+            {
+                xtype: 'button',
+                ui: 'action',
+                cls: 'verify',
+                action: 'vkbutton',
+                text: 'Увійти через VK'
             }
         ]
     }
@@ -58786,6 +58807,8 @@ Ext.define('App.controller.Login', {
             loginForm: 'login formpanel',
             loginButton: 'login button[action=login]',
             fbbuttonButton: 'login button[action=fbbutton]',
+            gbuttonButton: 'login button[action=gbutton]',
+            vkbuttonButton: 'login button[action=vkbutton]',
             logoutButton: 'works button[action=logout]'
         },
         control: {
@@ -58794,6 +58817,12 @@ Ext.define('App.controller.Login', {
             },
             fbbuttonButton: {
                 tap: 'onFbbuttonButtonButton'
+            },
+            gbuttonButton: {
+                tap: 'onGbuttonButtonButton'
+            },
+            vkbuttonButton: {
+                tap: 'onVkbuttonButtonButton'
             },
             logoutButton: {
                 tap: 'onLogoutButton'
@@ -58831,14 +58860,14 @@ Ext.define('App.controller.Login', {
                 //console.log(result.Data[0].fullname);
                 console.log(result.Status);
                 console.log(result);
-                if (result.Status) {
+                if (result) {
                     var userData = {
-                            id: result.Data[0].id,
-                            name: result.Data[0].fullname,
-                            sessionid: result.Data[0].sessionid,
-                            score: result.Data[0].nowPoints,
-                            photo: result.Data[0].photo,
-                            email: result.Data[0].email
+                            userId: result.id,
+                            name: result.fullname,
+                            sessionId: result.sessionid,
+                            score: result.nowPoints,
+                            photo: result.photo,
+                            email: result.email
                         };
                     usersStore.removeAll();
                     user = usersStore.add(userData)[0];
@@ -58849,14 +58878,68 @@ Ext.define('App.controller.Login', {
     },
     onFbbuttonButtonButton: function(button) {
         console.log('FB button');
+        var me = this,
+            usersStore = Ext.getStore('Users'),
+            user;
+        //console.log(data);
+        usersStore.removeAll();
+        Ext.Ajax.setUseDefaultXhrHeader(false);
+        Ext.Ajax.setDefaultHeaders({});
+        function loginBysoc(id, provider, email) {
+            Ext.Ajax.request({
+                method: 'POST',
+                url: App.config.Main.getApiUrl() + 'loginBysoc',
+                params: {
+                    id_user: id,
+                    provider: provider,
+                    email: email
+                },
+                withCredentials: false,
+                success: function(response) {
+                    //console.log(response);
+                    var result = Ext.JSON.decode(response.responseText, true);
+                    //console.log(result.Data[0].fullname);
+                    console.log(result);
+                    if (result.Status) {
+                        var userData = {
+                                userId: result.Data[0].id,
+                                name: result.Data[0].fullname,
+                                sessionId: result.Data[0].sessionid,
+                                score: result.Data[0].nowPoints,
+                                photo: result.Data[0].photo,
+                                email: result.Data[0].email
+                            };
+                        usersStore.removeAll();
+                        user = usersStore.add(userData)[0];
+                        me.redirectTo('home');
+                    }
+                }
+            });
+        }
+
         var fbLoginSuccess = function(userData) {
-                alert("UserInfo: " + JSON.stringify(userData));
+                //alert("UserInfo: " + JSON.stringify(userData));
+                if (userData.status === "connected") {
+                    loginBysoc(userData.authResponse.userID, 'Facebook', 'email');
+                } else {
+                    Ext.Msg.alert('Помилка', '');
+                }
             };
         facebookConnectPlugin.login([
             "public_profile"
-        ], fbLoginSuccess, function(error) {
-            alert("" + error);
+        ], fbLoginSuccess, function(error) {});
+    },
+    onGbuttonButtonButton: function(button) {
+        console.log('Google button');
+        window.plugins.googleplus.login({}, function(obj) {
+            alert(JSON.stringify(obj));
+        }, // do something useful instead of alerting
+        function(msg) {
+            alert('error: ' + msg);
         });
+    },
+    onVkbuttonButtonButton: function(button) {
+        console.log('VK button');
     },
     getToken: function(callback) {
         Ext.Ajax.setDefaultHeaders({});
@@ -59583,12 +59666,54 @@ Ext.define('App.view.Library', {
     }
 });
 
+Ext.define('App.view.ExamplesCarousel', {
+    extend: 'Ext.Carousel',
+    xtype: 'examplescarousel',
+    config: {
+        cls: 'x-examplescarousel',
+        indicator: false,
+        listeners: {
+            activeitemchange: function(carousel, item, oldItem, eOpts) {
+                //console.log('activeitemchange');
+                var index = carousel.getActiveIndex();
+                //console.log(index);
+                var data = carousel.getData(),
+                    records = data && data.getRange();
+                if (Ext.isEmpty(records)) {
+                    return;
+                }
+                // Current
+                if (Ext.isEmpty(item.getSrc())) {
+                    var record = records[index];
+                    item.setSrc(App.config.Main.getImageUrl() + record.data.image);
+                }
+                // Previous
+                if (index > 0) {
+                    var prevItem = carousel.getAt(index - 1),
+                        record = records[index - 1];
+                    if (prevItem && Ext.isEmpty(prevItem.getSrc())) {
+                        prevItem.setSrc(App.config.Main.getImageUrl() + record.data.image);
+                    }
+                }
+                // Next
+                if (index < records.length) {
+                    var nextItem = carousel.getAt(index + 1),
+                        record = records[index + 1];
+                    if (nextItem && Ext.isEmpty(nextItem.getSrc())) {
+                        nextItem.setSrc(App.config.Main.getImageUrl() + record.data.image);
+                    }
+                }
+            }
+        }
+    }
+});
+
 Ext.define('App.view.Example', {
     extend: 'Ext.Container',
     xtype: 'example',
     config: {
         fullscreen: true,
-        styleHtmlContent: true,
+        cls: 'x-view-example',
         layout: 'vbox',
         items: [
             {
@@ -59613,26 +59738,9 @@ Ext.define('App.view.Example', {
                 xtype: 'spacer'
             },
             {
-                xtype: 'carousel',
-                //flex: 1,
-                width: '320px',
-                height: '300px',
-                style: 'margin: 0 -1.2em;',
-                indicator: false,
-                items: [
-                    {
-                        html: 'Item 1',
-                        style: 'background-color: #5E99CC'
-                    },
-                    {
-                        html: 'Item 2',
-                        style: 'background-color: #759E60'
-                    },
-                    {
-                        html: 'Item 3',
-                        style: 'background-color: #a7187b'
-                    }
-                ]
+                xtype: 'examplescarousel',
+                width: '100%',
+                height: Ext.os.is.Phone ? '300px' : '500px'
             },
             {
                 xtype: 'spacer'
@@ -59646,7 +59754,7 @@ Ext.define('App.view.Example', {
                     },
                     {
                         xtype: 'button',
-                        ui: 'action',
+                        ui: 'tool',
                         iconCls: 'favorite',
                         action: 'favorite'
                     },
@@ -59655,7 +59763,7 @@ Ext.define('App.view.Example', {
                     },
                     {
                         xtype: 'button',
-                        ui: 'action',
+                        ui: 'tool',
                         iconCls: 'facebook',
                         action: 'facebook'
                     },
@@ -59663,6 +59771,9 @@ Ext.define('App.view.Example', {
                         xtype: 'spacer'
                     }
                 ]
+            },
+            {
+                xtype: 'spacer'
             }
         ]
     }
@@ -59718,7 +59829,8 @@ Ext.define('App.controller.Library', {
             'CategoriesList',
             'Examples',
             'ExamplesList',
-            'Example'
+            'Example',
+            'ExamplesCarousel'
         ],
         models: [
             'Example',
@@ -59746,6 +59858,7 @@ Ext.define('App.controller.Library', {
             },
             categoriesList: 'library categorieslist',
             examplesList: 'examples exampleslist',
+            examplesCarousel: 'example carousel',
             backButtonExamples: 'examples button[action=back]',
             backButtonExample: 'example button[action=back]',
             favoriteButton: 'library button[action=favorite]',
@@ -59809,19 +59922,28 @@ Ext.define('App.controller.Library', {
             type: 'slide',
             direction: 'left'
         });
-        var examplesStore = Ext.getStore('Examples'),
-            examplesList = this.getExamplesList();
-        examplesStore.getProxy().setExtraParams({
+        var examplesList = this.getExamplesList(),
+            exampleView = this.getExampleView() || Ext.create('App.view.Examples'),
+            examplesCarousel = this.getExamplesCarousel();
+        this.loadExamples({
             parent: category
+        }, function(store, records) {
+            var data = store.getData();
+            examplesList.setData(data);
+            examplesCarousel.setData(data);
         });
+    },
+    loadExamples: function(params, successCallback, errorCallback) {
+        var params = params || {},
+            examplesStore = Ext.getStore('Examples');
+        examplesStore.getProxy().setExtraParams(params);
         examplesStore.on('load', function(store, records, successful) {
             if (!successful) {
+                errorCallback && errorCallback();
                 return;
             }
             //console.log(records);
-            var data = store.getData();
-            //console.log(data);
-            examplesList.setData(data);
+            successCallback && successCallback(store, records);
         }, this, {
             single: true
         });
@@ -59829,7 +59951,27 @@ Ext.define('App.controller.Library', {
     },
     showExample: function(id) {
         console.log('show example id ' + id);
-        var exampleView = this.getExampleView();
+        var exampleView = this.getExampleView() || Ext.create('App.view.Examples'),
+            examplesCarousel = this.getExamplesCarousel(),
+            data = examplesCarousel.getData(),
+            records = data && data.getRange();
+        if (Ext.isEmpty(records)) {
+            console.error('Empty carousel data!');
+            return;
+        }
+        var items = [],
+            currentIndex = 0;
+        Ext.Array.each(records, function(record, index) {
+            items.push({
+                xtype: 'image'
+            });
+            if (record.data.id == id)  {
+                currentIndex = index;
+            }
+
+        });
+        examplesCarousel.setItems(items);
+        examplesCarousel.setActiveItem(currentIndex);
         Ext.Viewport.setActiveItem(exampleView);
     },
     onFavoriteButton: function() {
@@ -60040,8 +60182,11 @@ Ext.define('App.controller.Out', {
     },
     showOut: function() {
         console.log('show out');
-        var outView = this.getOutView();
-        Ext.Viewport.setActiveItem(outView);
+        console.log('tap logout');
+        var me = this,
+            usersStore = Ext.getStore('Users');
+        usersStore.removeAll();
+        me.redirectTo('login');
     }
 });
 
