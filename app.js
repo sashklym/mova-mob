@@ -58900,14 +58900,14 @@ Ext.define('App.controller.Login', {
                     var result = Ext.JSON.decode(response.responseText, true);
                     //console.log(result.Data[0].fullname);
                     console.log(result);
-                    if (result.Status) {
+                    if (result) {
                         var userData = {
-                                userId: result.Data[0].id,
-                                name: result.Data[0].fullname,
-                                sessionId: result.Data[0].sessionid,
-                                score: result.Data[0].nowPoints,
-                                photo: result.Data[0].photo,
-                                email: result.Data[0].email
+                                userId: result.id,
+                                name: result.fullname,
+                                sessionId: result.sessionid,
+                                score: result.nowPoints,
+                                photo: result.photo,
+                                email: result.email
                             };
                         usersStore.removeAll();
                         user = usersStore.add(userData)[0];
@@ -60248,7 +60248,7 @@ Ext.define('App.controller.Settings', {
     }
 });
 
-Ext.define('App.model.Trenings', {
+Ext.define('App.model.Trening', {
     extend: 'Ext.data.Model',
     config: {
         fields: [
@@ -60256,18 +60256,6 @@ Ext.define('App.model.Trenings', {
             'pagetitle',
             'alias',
             'image'
-        ]
-    }
-});
-
-Ext.define('App.model.Onetrening', {
-    extend: 'Ext.data.Model',
-    config: {
-        fields: [
-            'id',
-            'pagetitle',
-            'parent',
-            'exersise'
         ]
     }
 });
@@ -60351,6 +60339,21 @@ Ext.define('App.view.Onetrening', {
                                 text: 'Далі'
                             }
                         ]
+                    },
+                    {
+                        xtype: 'container',
+                        itemId: 'showResult',
+                        cls: 'showResult',
+                        tpl: [
+                            '<div class="">',
+                            '<div class="img">{img_lepetun}</div>',
+                            '<div class="info">',
+                            '<h1>{text}</h1>',
+                            '<h2>Ваш результат:</h2>',
+                            '<h3>{result}</h3>',
+                            '</div>',
+                            '</div>'
+                        ].join('')
                     },
                     {
                         xtype: 'spacer'
@@ -60643,34 +60646,13 @@ Ext.define('App.view.Trening', {
 Ext.define('App.store.Trenings', {
     extend: 'Ext.data.Store',
     config: {
-        model: 'App.model.Trenings',
+        model: 'App.model.Trening',
         //      pageSize: 4,
         autoLoad: false,
         clearOnPageLoad: true,
         proxy: {
             type: 'ajax',
             url: App.config.Main.getApiUrl() + 'tests',
-            useDefaultXhrHeader: false,
-            pageParam: true,
-            reader: {
-                type: 'json',
-                rootProperty: 'id',
-                successProperty: 'success'
-            }
-        }
-    }
-});
-
-Ext.define('App.store.Onetrening', {
-    extend: 'Ext.data.Store',
-    config: {
-        model: 'App.model.Onetrening',
-        //      pageSize: 4,
-        autoLoad: false,
-        clearOnPageLoad: true,
-        proxy: {
-            type: 'ajax',
-            url: App.config.Main.getApiUrl() + 'test',
             useDefaultXhrHeader: false,
             pageParam: true,
             reader: {
@@ -60691,12 +60673,10 @@ Ext.define('App.controller.Trening', {
             'Onetrening'
         ],
         models: [
-            'Trenings',
-            'Onetrening'
+            'Trening'
         ],
         stores: [
-            'Trenings',
-            'Onetrening'
+            'Trenings'
         ],
         refs: {
             treningView: {
@@ -60791,6 +60771,7 @@ Ext.define('App.controller.Trening', {
             lebelwrong: onetreningView.down('#lebelwrong'),
             lebelright: onetreningView.down('#lebelright'),
             treningAll: onetreningView.down('#treningAll'),
+            showResult: onetreningView.down('#showResult'),
             // ************* load all quetions for exercices ***********
             load_all_exersice: function() {
                 var onetreningStore = Ext.getStore('Onetrening');
@@ -60799,22 +60780,22 @@ Ext.define('App.controller.Trening', {
                 if (user) {
                     var UserData = {
                             email: user.get('email'),
-                            sessionid: user.get('sessionid')
+                            sessionId: user.get('sessionId')
                         };
                     Ext.Ajax.request({
                         method: 'POST',
                         url: App.config.Main.getApiUrl() + 'test&id=' + id,
                         params: {
                             username: UserData.email,
-                            sessionid: UserData.sessionid
+                            sessionid: UserData.sessionId
                         },
                         withCredentials: false,
                         success: function(response) {
                             //console.log(response);
                             var result = Ext.JSON.decode(response.responseText, true);
                             //console.log(result.Data[0].fullname);
-                            if (result.Status) {
-                                var data = result.Data[0].exersise;
+                            if (result) {
+                                var data = result.exersise;
                                 var myObject = eval('(' + data + ')');
                                 for (i in myObject) {
                                     exersice.num[i] = myObject[i]["MIGX_id"];
@@ -60833,35 +60814,6 @@ Ext.define('App.controller.Trening', {
                     this.redirectTo('login');
                 }
             },
-            //onetreningStore.getProxy().setExtraParams({id:id,username:UserData.username,sessionid:UserData.sessionid});
-            //                onetreningStore.on('load', function(store, records, successful) {
-            //                    if(!successful) {
-            //                        console.error('fail');
-            //                        return;
-            //                    }
-            //
-            //                    var record = store.getAt(0);
-            //                    console.info(record);
-            //                    var data = record.get('exersise');
-            //
-            //
-            //                    var myObject = eval('(' + data + ')');
-            //                    for (i in myObject){
-            //                       exersice.num [i] = myObject[i]["MIGX_id"];
-            //                       exersice.questions [i] = myObject[i]["questions"];
-            //                       exersice.answers [i] = myObject[i]["answers"];
-            //                       exersice.correct [i] = myObject[i]["correct"];
-            //                       exersice.explanation [i] = myObject[i]["explanation"];
-            //                    }
-            //
-            //                    exersice.show_now_quetions(0);
-            //
-            //                }, this,
-            //                {
-            //                    single: true
-            //                });
-            //
-            //                onetreningStore.load();
             show_pagination: function() {},
             //--------------- show now quetions --------------------
             show_now_quetions: function() {
@@ -60875,9 +60827,9 @@ Ext.define('App.controller.Trening', {
                 oneQuetion.quetion = exersice.questions[exersice.index_now];
                 oneQuetion.variantu = answers_variant;
                 if (exersice.index_now > 0) {
-                    Ext.Anim.run(exersice.treningAll, 'flip', {
-                        //direction: 'left',
-                        duration: 800,
+                    Ext.Anim.run(exersice.treningAll, 'slide', {
+                        direction: 'left',
+                        duration: 400,
                         after: function() {
                             exersice.quetionConteiner.setData(oneQuetion);
                             exersice.blockAfterOneAnswer.hide();
@@ -60921,14 +60873,22 @@ Ext.define('App.controller.Trening', {
             },
             //------------------ show result ------------------------
             show_result: function() {
-                Ext.Msg.alert('Правильних відповідей &ndash; ', exersice.sum_correct);
+                var obgResult = {
+                        img_lepetun: '<img scr="./resources/images/lepetun_1.png">',
+                        text: 'Можна і краще',
+                        result: exersice.sum_correct + ' з 10'
+                    };
+                exersice.showResult.setData(obgResult);
+                exersice.showResult.show();
+                console.log('show resul');
             },
-            //ajaxPreload
-            ajaxPreload: function(target, action) {
-                if (action === true) {} else {}
-            },
+            //                Ext.Msg.alert(
+            //                    'Правильних відповідей &ndash; ',
+            //                    exersice.sum_correct
+            //                );
             init: function() {
                 exersice.blockAfterOneAnswer.hide();
+                exersice.showResult.hide();
                 exersice.load_all_exersice();
             }
         };
