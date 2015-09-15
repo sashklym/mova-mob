@@ -2,7 +2,10 @@ var App = App || {};
 if (!App.config) App.config = {};
 if (!App.controller) App.controller = {};
 if (!App.model) App.model = {};
+if (!App.override) App.override = {};
+if (!App.override.viewport) App.override.viewport = {};
 if (!App.store) App.store = {};
+if (!App.util) App.util = {};
 if (!App.view) App.view = {};
 var Ext = Ext || {};
 if (!Ext.Carousel) Ext.Carousel = {};
@@ -57883,6 +57886,25 @@ Ext.define('Ext.viewport.Default', {
     }
 });
 
+Ext.define('App.override.viewport.Default', {
+    override: 'Ext.viewport.Default',
+    onSwipeStart: function(e) {
+        e.stopPropagation();
+    },
+    onEdgeSwipeStart: function(e) {
+        e.stopPropagation();
+        return;
+    },
+    onEdgeSwipe: function(e) {
+        e.stopPropagation();
+        return;
+    },
+    onEdgeSwipeEnd: function(e) {
+        e.stopPropagation();
+        return;
+    }
+});
+
 /**
  * @private
  * Android version of viewport.
@@ -58493,21 +58515,111 @@ Ext.define('App.config.Locale', {
     }
 });
 
+Ext.define('App.util.Sync', {
+    singleton: true,
+    syncAll: function(successCb, errorCb) {
+        var TOTAL = 2,
+            done = 0,
+            error = false;
+        function check() {
+            if (error && typeof errorCb == 'function') {
+                errorCb();
+                errorCb = false;
+            } else if (done == TOTAL && typeof successCb == 'function') {
+                successCb();
+            }
+        }
+        this.syncExamples(function() {
+            done++;
+            check();
+        }, function() {
+            error = true;
+            check();
+        });
+        this.syncCategories(function() {
+            done++;
+            check();
+        }, function() {
+            error = true;
+            check();
+        });
+    },
+    syncExamples: function(successCb, errorCb) {
+        var store = Ext.getStore('Examples'),
+            params = {
+                minId: this.getStoreMaxId(store)
+            };
+        Ext.Ajax.request({
+            method: 'GET',
+            url: App.config.Main.getApiUrl() + 'examples',
+            params: params,
+            success: function(response) {
+                //console.log(response);
+                var result = Ext.JSON.decode(response.responseText, true);
+                //console.log(result);
+                if (!Ext.isEmpty(result)) {
+                    store.add(result);
+                }
+                successCb();
+            },
+            failure: function(response) {
+                errorCb();
+            }
+        });
+    },
+    syncCategories: function(successCb, errorCb) {
+        var store = Ext.getStore('Categories'),
+            params = {
+                minId: this.getStoreMaxId(store)
+            };
+        Ext.Ajax.request({
+            method: 'GET',
+            url: App.config.Main.getApiUrl() + 'categories',
+            params: params,
+            success: function(response) {
+                //console.log(response);
+                var result = Ext.JSON.decode(response.responseText, true);
+                //console.log(result);
+                if (!Ext.isEmpty(result)) {
+                    store.add(result);
+                }
+                successCb();
+            },
+            failure: function(response) {
+                errorCb();
+            }
+        });
+    },
+    syncQueue: function(successCb, errorCb) {},
+    getStoreMaxId: function(store) {
+        var maxId = 0;
+        store.each(function(item, index, length) {
+            var id = Number(item.get('id'));
+            if (id > maxId) {
+                maxId = id;
+            }
+        });
+        return maxId;
+    }
+});
+
 Ext.define('App.model.User', {
     extend: 'Ext.data.Model',
     config: {
+        idProperty: 'internalId',
         identifier: 'uuid',
         fields: [
-            'userId',
-            'name',
-            'score',
-            'email',
-            'scoreTotal',
-            'reminder',
-            'reminderTime',
-            'openTime',
+            'id',
             'sessionId',
-            'photo'
+            'name',
+            'email',
+            'photo',
+            'nowPoints',
+            'totalPoints',
+            'favorite',
+            'reminder',
+            'reminderDate',
+            'syncDate'
         ]
     }
 });
@@ -58529,7 +58641,7 @@ Ext.define('App.view.LeftMenu', {
                 xtype: 'label',
                 itemId: 'leftMenuInfoUser',
                 tpl: [
-                    '{photo}{name} <br>Cмаколики - {score} '
+                    '{photo}{name} <br>Cмаколики - {nowPoints} '
                 ].join('')
             },
             {
@@ -58559,8 +58671,8 @@ Ext.define('App.view.LeftMenu', {
             },
             {
                 text: 'Вийти',
-                iconCls: 'out',
-                action: 'out'
+                iconCls: 'logout',
+                action: 'logout'
             }
         ]
     }
@@ -58621,8 +58733,16 @@ Ext.define('App.controller.Main', {
     },
     init: function() {
         //console.log('main init');
+        // FIX: Android x-portrait / x-landscape
+        Ext.Viewport.bodyElement.on('resize', Ext.emptyFn, this, {
+            buffer: 1
+        });
+        // FIX: MessageBox not hide after show animation
+        Ext.Msg.defaultAllowedConfig.showAnimation = false;
         // This should be set to false when making CORS (cross-domain) requests
         Ext.Ajax.setUseDefaultXhrHeader(false);
+        // New request should abort any pending requests
+        Ext.Ajax.setAutoAbort(false);
         // AJAX Start
         Ext.Ajax.on('beforerequest', function(conn, response, options) {
             if (Ext.Ajax.disableAnimation) {
@@ -58640,53 +58760,96 @@ Ext.define('App.controller.Main', {
             Ext.Viewport.unmask();
         }, this);
         // AJAX Error
-        Ext.Ajax.on('requestexception', function() {
-            console.log('request exception');
-            Ext.Msg.alert('Помилка', 'Неможливо отримати дані!');
-        });
+        Ext.Ajax.on('requestexception', function(conn, response, options) {
+            Ext.Viewport.unmask();
+            if (Ext.Ajax.ignoreError) {
+                Ext.Ajax.ignoreError = false;
+                return true;
+            }
+            if (response.aborted) {
+                return true;
+            }
+            switch (response.status) {
+                case 0:
+                    Ext.Msg.alert('Помилка', 'Для продовження роботи підключіть пристрій до інтернету');
+                    break;
+                case 401:
+                    Ext.Msg.alert('Помилка', 'Невірний логін або пароль');
+                    //this.redirectTo('login');
+                    break;
+                default:
+                    Ext.Msg.alert('Помилка', 'Неможливо отримати дані');
+            }
+        }, this);
+        // Android: Back button behavior
+        if (Ext.os.is.Android) {
+            document.addEventListener('backbutton', function(e) {
+                e.preventDefault();
+                switch (window.location.hash) {
+                    case '#login':
+                    case '#home':
+                        navigator.app.exitApp();
+                        break;
+                    default:
+                        window.history.back();
+                }
+            }, false);
+        }
+        // Menu
+        Ext.Viewport.on('activeitemchange', function(viewport, newView, oldView) {
+            //console.log(newView.xtype);
+            if ([
+                'home',
+                'about',
+                'library',
+                'favorite',
+                'trening',
+                'settings'
+            ].indexOf(newView.xtype) > -1) {
+                this.activateMenu();
+            } else {
+                this.deactivateMenu();
+            }
+        }, this);
     },
     launch: function() {
-        console.log('main launch');
-        var leftMenu = this.getLeftMenu();
-        // Add Left Menu
-        Ext.Viewport.setMenu(leftMenu, {
-            side: 'left',
-            reveal: true
-        });
+        console.log('launch main');
         // Cordova: Hide Splash Screen
         setTimeout(function() {
             navigator.splashscreen.hide();
-        }, 1000);
-        // FIX: MessageBox not hiding
-        if (Ext.os.is.Android) {
-            Ext.Msg.defaultAllowedConfig.showAnimation = false;
-            Ext.Msg.defaultAllowedConfig.hideAnimation = false;
-        }
+        }, 2000);
         // DEBUG: Prevent redirect to login after page refresh
         if (window.location.hash.length > 1)  {
             return;
         }
 
         var user = Ext.getStore('Users').getAt(0);
-        if (user && user.get('name') && user.get('sessionId')) {
+        if (user) {
             this.redirectTo('home');
         } else {
             this.redirectTo('login');
         }
     },
+    activateMenu: function() {
+        Ext.Viewport.setMenu(this.getLeftMenu(), {
+            side: 'left',
+            reveal: true
+        });
+    },
+    deactivateMenu: function() {
+        Ext.Viewport.removeMenu('left');
+    },
     onToggleLeftMenuButton: function(button) {
         //console.log('toggle menu');
         Ext.Viewport.toggleMenu('left');
+        // TODO: Move to login controller
         var leftMenu = this.getLeftMenu();
         var user = Ext.getStore('Users').getAt(0);
-        var UserData = {
-                username: user.get('name'),
-                sessionid: user.get('sessionId')
-            };
+        // TODO: Remove html from controller
         leftMenu.down('#leftMenuInfoUser').setData({
             name: user.get('name'),
             photo: user.get('photo') ? '<img class="img_user" src="' + user.get("photo") + '"> ' : '<div class="img_user">u</div>',
-            score: user.get('score')
+            nowPoints: user.get('nowPoints')
         });
     },
     onLeftMenuButton: function(button) {
@@ -58705,17 +58868,16 @@ Ext.define('App.controller.Main', {
     onBackButton: function(button) {
         //console.log('tap back');
         history.back();
-        //pop the state to trigger listener in step 3
         return false;
     }
 });
-// return false so listener will take care of this
 
 Ext.define('App.view.Login', {
     extend: 'Ext.Container',
     xtype: 'login',
     config: {
         fullscreen: true,
+        scrollable: 'vertical',
         cls: 'x-view-login',
         items: [
             {
@@ -58739,17 +58901,15 @@ Ext.define('App.view.Login', {
                         name: 'username',
                         label: 'Логін',
                         labelAlign: 'top',
-                        value: 'sasha_klymenko@ukr.net'
+                        placeHolder: 'Логін'
                     },
-                    //placeHolder: 'Логін'
                     {
                         xtype: 'passwordfield',
                         name: 'password',
                         label: 'Пароль',
                         labelAlign: 'top',
-                        value: 'movatestpass'
+                        placeHolder: 'Пароль'
                     },
-                    //placeHolder: 'Пароль'
                     {
                         xtype: 'button',
                         action: 'login',
@@ -58757,6 +58917,10 @@ Ext.define('App.view.Login', {
                         text: 'Ввійти'
                     }
                 ]
+            },
+            {
+                xtype: 'label',
+                html: 'Або ввійдіть за допомогою соц. мереж'
             },
             {
                 xtype: 'spacer'
@@ -58785,8 +58949,8 @@ Ext.define('App.view.Login', {
                 xtype: 'button',
                 ui: 'action',
                 cls: 'verify',
-                action: 'vkbutton',
-                text: 'Увійти через VK'
+                action: 'registration',
+                text: 'Зареєструватись'
             }
         ]
     }
@@ -58829,7 +58993,8 @@ Ext.define('App.controller.Login', {
             }
         },
         routes: {
-            'login': 'showLogin'
+            'login': 'showLogin',
+            'logout': 'showLogout'
         }
     },
     showLogin: function() {
@@ -58837,6 +59002,21 @@ Ext.define('App.controller.Login', {
         var loginView = this.getLoginView(),
             loginForm = this.getLoginForm();
         Ext.Viewport.setActiveItem(loginView);
+        // DEBUG: Form autofill
+        setTimeout(function() {
+            loginForm.setValues({
+                username: 'sasha_klymenko@ukr.net',
+                password: 'movatestpass'
+            });
+        }, 2 * 1000);
+    },
+    showLogout: function() {
+        console.log('show logout');
+        Ext.getStore('Users').removeAll();
+        Ext.getStore('Categories').removeAll();
+        Ext.getStore('Examples').removeAll();
+        Ext.getStore('Trenings').removeAll();
+        this.redirectTo('login');
     },
     onLoginButton: function(button) {
         //console.log('tap login');
@@ -58846,9 +59026,6 @@ Ext.define('App.controller.Login', {
             usersStore = Ext.getStore('Users'),
             user;
         //console.log(data);
-        usersStore.removeAll();
-        Ext.Ajax.setUseDefaultXhrHeader(false);
-        Ext.Ajax.setDefaultHeaders({});
         Ext.Ajax.request({
             method: 'POST',
             url: App.config.Main.getApiUrl() + 'login',
@@ -58857,20 +59034,10 @@ Ext.define('App.controller.Login', {
             success: function(response) {
                 //console.log(response);
                 var result = Ext.JSON.decode(response.responseText, true);
-                //console.log(result.Data[0].fullname);
-                console.log(result.Status);
                 console.log(result);
-                if (result) {
-                    var userData = {
-                            userId: result.id,
-                            name: result.fullname,
-                            sessionId: result.sessionid,
-                            score: result.nowPoints,
-                            photo: result.photo,
-                            email: result.email
-                        };
+                if (result && result.id) {
                     usersStore.removeAll();
-                    user = usersStore.add(userData)[0];
+                    user = usersStore.add(result)[0];
                     me.redirectTo('home');
                 }
             }
@@ -58881,10 +59048,6 @@ Ext.define('App.controller.Login', {
         var me = this,
             usersStore = Ext.getStore('Users'),
             user;
-        //console.log(data);
-        usersStore.removeAll();
-        Ext.Ajax.setUseDefaultXhrHeader(false);
-        Ext.Ajax.setDefaultHeaders({});
         function loginBysoc(id, provider, email) {
             Ext.Ajax.request({
                 method: 'POST',
@@ -58898,19 +59061,10 @@ Ext.define('App.controller.Login', {
                 success: function(response) {
                     //console.log(response);
                     var result = Ext.JSON.decode(response.responseText, true);
-                    //console.log(result.Data[0].fullname);
                     console.log(result);
-                    if (result) {
-                        var userData = {
-                                userId: result.id,
-                                name: result.fullname,
-                                sessionId: result.sessionid,
-                                score: result.nowPoints,
-                                photo: result.photo,
-                                email: result.email
-                            };
+                    if (result && result.id) {
                         usersStore.removeAll();
-                        user = usersStore.add(userData)[0];
+                        user = usersStore.add(result)[0];
                         me.redirectTo('home');
                     }
                 }
@@ -58920,7 +59074,7 @@ Ext.define('App.controller.Login', {
         var fbLoginSuccess = function(userData) {
                 //alert("UserInfo: " + JSON.stringify(userData));
                 if (userData.status === "connected") {
-                    loginBysoc(userData.authResponse.userID, 'Facebook', 'email');
+                    loginBysoc(userData.authResponse.userID, 'Facebook', 'email', userData.authResponse.accessToken);
                 } else {
                     Ext.Msg.alert('Помилка', '');
                 }
@@ -58936,42 +59090,6 @@ Ext.define('App.controller.Login', {
         }, // do something useful instead of alerting
         function(msg) {
             alert('error: ' + msg);
-        });
-    },
-    onVkbuttonButtonButton: function(button) {
-        console.log('VK button');
-    },
-    getToken: function(callback) {
-        Ext.Ajax.setDefaultHeaders({});
-        Ext.Ajax.request({
-            method: 'GET',
-            url: App.config.Main.getApiUrl() + 'services/session/token',
-            withCredentials: true,
-            success: function(response) {
-                //console.log(response);
-                var token = response.responseText;
-                //console.log(token);
-                callback && callback(token);
-            }
-        });
-    },
-    onLogoutButton: function() {
-        console.log('tap logout');
-        var me = this,
-            usersStore = Ext.getStore('Users');
-        Ext.Ajax.request({
-            method: 'POST',
-            url: App.config.Main.getApiUrl() + 'endpoint/user/logout.json',
-            withCredentials: true,
-            success: function(response) {
-                //console.log(response);
-                var result = Ext.JSON.decode(response.responseText, true);
-                //console.log(result);
-                usersStore.removeAll();
-                App.isBreak = false;
-                App.checkBreakTimeout && clearTimeout(App.checkBreakTimeout);
-                me.redirectTo('login');
-            }
         });
     }
 });
@@ -59074,8 +59192,11 @@ Ext.define('App.controller.Home', {
         });
         var user = Ext.getStore('Users').getAt(0);
         if (user && user.get('name') && user.get('sessionid')) {}
+        //this.redirectTo('home');
+        App.util.Sync.syncAll(function() {
+            console.log('sync all');
+        });
     },
-    //this.redirectTo('home');
     onLibraryButton: function() {
         console.log('tap library');
         // Go to Library
@@ -59091,12 +59212,15 @@ Ext.define('App.controller.Home', {
 Ext.define('App.model.Example', {
     extend: 'Ext.data.Model',
     config: {
+        idProperty: 'internalId',
+        identifier: 'uuid',
         fields: [
             'id',
-            'pagetitle',
-            'alias',
+            'title',
             'image',
-            'imageTumb'
+            'thumb',
+            'category',
+            'uri'
         ]
     }
 });
@@ -59104,12 +59228,12 @@ Ext.define('App.model.Example', {
 Ext.define('App.model.Category', {
     extend: 'Ext.data.Model',
     config: {
+        idProperty: 'internalId',
+        identifier: 'uuid',
         fields: [
             'id',
-            'pagetitle',
-            'alias',
-            'image',
-            'imageTumb'
+            'title',
+            'image'
         ]
     }
 });
@@ -59120,10 +59244,10 @@ Ext.define('App.view.ExamplesList', {
     config: {
         scrollable: 'vertical',
         store: 'Examples',
-        loadingText: 'Загрузка...',
-        emptyText: 'Товаров не найдено',
+        loadingText: '',
+        emptyText: 'Прикладів не знайдено',
         cls: 'x-exampleslist',
-        tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image"><img src="{data.imageTumb:this.getUrl}" /></div>', '</div>', '</tpl>', {
+        tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image: url({data.thumb:this.getUrl})">', '<div class="icon-remove">X</div>', '</div>', '</div>', '</tpl>', {
             getUrl: function(name) {
                 return App.config.Main.getImageUrl() + name;
             }
@@ -59143,6 +59267,12 @@ Ext.define('App.view.ExamplesList', {
         //console.log('tap');
         var element = Ext.get(e.target),
             fireEvent, id;
+        if (element.hasCls('icon-remove')) {
+            var parent = element.parent('.item'),
+                id = parent.getAttribute('ref');
+            this.fireEvent('icontap', this, id, element);
+            return;
+        }
         if (element.hasCls('item') || element.parent('.item')) {
             fireEvent = 'itemtap';
         }
@@ -59399,7 +59529,7 @@ Ext.define('App.view.CategoriesList', {
         loadingText: 'Загрузка...',
         emptyText: 'Товаров не найдено',
         cls: 'x-categorieslist',
-        tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image:url({data.image:this.getUrl});{imageCss}><img src="{data.image:this.getUrl}" /></div>', '<div class="name">{data.pagetitle}</div>', '</div>', '</tpl>', {
+        tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image:url({data.image:this.getUrl});{imageCss}><img src="{data.image:this.getUrl}" /></div>', '<div class="name">{data.title}</div>', '</div>', '</tpl>', {
             getUrl: function(name) {
                 return App.config.Main.getImageUrl() + name;
             }
@@ -59666,48 +59796,6 @@ Ext.define('App.view.Library', {
     }
 });
 
-Ext.define('App.view.ExamplesCarousel', {
-    extend: 'Ext.Carousel',
-    xtype: 'examplescarousel',
-    config: {
-        cls: 'x-examplescarousel',
-        indicator: false,
-        listeners: {
-            activeitemchange: function(carousel, item, oldItem, eOpts) {
-                //console.log('activeitemchange');
-                var index = carousel.getActiveIndex();
-                //console.log(index);
-                var data = carousel.getData(),
-                    records = data && data.getRange();
-                if (Ext.isEmpty(records)) {
-                    return;
-                }
-                // Current
-                if (Ext.isEmpty(item.getSrc())) {
-                    var record = records[index];
-                    item.setSrc(App.config.Main.getImageUrl() + record.data.image);
-                }
-                // Previous
-                if (index > 0) {
-                    var prevItem = carousel.getAt(index - 1),
-                        record = records[index - 1];
-                    if (prevItem && Ext.isEmpty(prevItem.getSrc())) {
-                        prevItem.setSrc(App.config.Main.getImageUrl() + record.data.image);
-                    }
-                }
-                // Next
-                if (index < records.length) {
-                    var nextItem = carousel.getAt(index + 1),
-                        record = records[index + 1];
-                    if (nextItem && Ext.isEmpty(nextItem.getSrc())) {
-                        nextItem.setSrc(App.config.Main.getImageUrl() + record.data.image);
-                    }
-                }
-            }
-        }
-    }
-});
-
 Ext.define('App.view.Example', {
     extend: 'Ext.Container',
     xtype: 'example',
@@ -59738,7 +59826,8 @@ Ext.define('App.view.Example', {
                 xtype: 'spacer'
             },
             {
-                xtype: 'examplescarousel',
+                xtype: 'carousel',
+                indicator: false,
                 width: '100%',
                 height: Ext.os.is.Phone ? '300px' : '500px'
             },
@@ -59747,6 +59836,7 @@ Ext.define('App.view.Example', {
             },
             {
                 xtype: 'panel',
+                itemId: 'actionPanel',
                 layout: 'hbox',
                 items: [
                     {
@@ -59754,18 +59844,19 @@ Ext.define('App.view.Example', {
                     },
                     {
                         xtype: 'button',
-                        ui: 'tool',
-                        iconCls: 'favorite',
-                        action: 'favorite'
+                        itemId: 'toogleFavorite',
+                        ui: 'favorite',
+                        iconCls: 'favorite'
                     },
                     {
-                        xtype: 'spacer'
+                        xtype: 'spacer',
+                        width: 120
                     },
                     {
                         xtype: 'button',
-                        ui: 'tool',
-                        iconCls: 'facebook',
-                        action: 'facebook'
+                        itemId: 'share',
+                        ui: 'share',
+                        iconCls: 'facebook'
                     },
                     {
                         xtype: 'spacer'
@@ -59779,23 +59870,51 @@ Ext.define('App.view.Example', {
     }
 });
 
+Ext.define('App.view.ExamplesCarouselItem', {
+    extend: 'Ext.Container',
+    xtype: 'examplescarouselitem',
+    config: {
+        cls: 'x-examples-carousel-item',
+        layout: 'fit',
+        items: {
+            xtype: 'image'
+        }
+    },
+    initialize: function() {
+        this.on('painted', this.onPainted, this, {
+            delay: 10,
+            single: true
+        });
+    },
+    onPainted: function(element) {
+        //console.log('painted');
+        var image = this.down('image'),
+            data = this.getData(),
+            imageSrc = App.config.Main.getImageUrl() + data.image;
+        //console.log(data);
+        this.mask({
+            xtype: 'loadmask',
+            transparent: true,
+            message: ''
+        });
+        image.on('load', this.onImageLoad, this);
+        image.setSrc(imageSrc);
+    },
+    onImageLoad: function() {
+        //console.log('load');
+        this.unmask();
+    }
+});
+
 Ext.define('App.store.Examples', {
     extend: 'Ext.data.Store',
     config: {
         model: 'App.model.Example',
-        //      pageSize: 4,
-        autoLoad: false,
-        clearOnPageLoad: true,
+        autoLoad: true,
+        autoSync: true,
         proxy: {
-            type: 'ajax',
-            url: App.config.Main.getApiUrl() + 'examples',
-            useDefaultXhrHeader: false,
-            pageParam: true,
-            reader: {
-                type: 'json',
-                rootProperty: 'id',
-                successProperty: 'success'
-            }
+            type: 'localstorage',
+            id: 'examples'
         }
     }
 });
@@ -59804,19 +59923,11 @@ Ext.define('App.store.Categories', {
     extend: 'Ext.data.Store',
     config: {
         model: 'App.model.Category',
-        //      pageSize: 4,
-        autoLoad: false,
-        clearOnPageLoad: true,
+        autoLoad: true,
+        autoSync: true,
         proxy: {
-            type: 'ajax',
-            url: App.config.Main.getApiUrl() + 'categories',
-            useDefaultXhrHeader: false,
-            pageParam: true,
-            reader: {
-                type: 'json',
-                rootProperty: 'id',
-                successProperty: 'success'
-            }
+            type: 'localstorage',
+            id: 'categories'
         }
     }
 });
@@ -59830,7 +59941,7 @@ Ext.define('App.controller.Library', {
             'Examples',
             'ExamplesList',
             'Example',
-            'ExamplesCarousel'
+            'ExamplesCarouselItem'
         ],
         models: [
             'Example',
@@ -59861,8 +59972,8 @@ Ext.define('App.controller.Library', {
             examplesCarousel: 'example carousel',
             backButtonExamples: 'examples button[action=back]',
             backButtonExample: 'example button[action=back]',
-            favoriteButton: 'library button[action=favorite]',
-            facebookButton: 'library button[action=facebook]'
+            favoriteButton: 'example #toogleFavorite',
+            facebookButton: 'example #share'
         },
         control: {
             favoriteButton: {
@@ -59876,6 +59987,9 @@ Ext.define('App.controller.Library', {
             },
             categoriesList: {
                 itemtap: 'onCategoriesListTap'
+            },
+            examplesCarousel: {
+                activeitemchange: 'onCarouselActiveItemChange'
             }
         },
         routes: {
@@ -59893,26 +60007,15 @@ Ext.define('App.controller.Library', {
         });
         var categotiesStore = Ext.getStore('Categories'),
             categoriesList = this.getCategoriesList();
-        categotiesStore.getProxy().setExtraParams({});
-        categotiesStore.on('load', function(store, records, successful) {
-            if (!successful) {
-                return;
-            }
-            //console.log(records);
-            var data = store.getData();
-            //console.log(data);
-            categoriesList.setData(data);
-        }, this, {
-            single: true
-        });
-        categotiesStore.load();
+        categotiesStore.clearFilter();
+        categoriesList.setData(categotiesStore.getData());
     },
     onCategoriesListTap: function(view, id) {
         console.log('tap list item');
         this.redirectTo('library/examples/' + id);
     },
     onExamplesListTap: function(view, id) {
-        console.log('one example tap list item');
+        console.log('tap list item');
         this.redirectTo('library/example/' + id);
     },
     showExamples: function(category) {
@@ -59922,38 +60025,21 @@ Ext.define('App.controller.Library', {
             type: 'slide',
             direction: 'left'
         });
-        var examplesList = this.getExamplesList(),
-            exampleView = this.getExampleView() || Ext.create('App.view.Examples'),
-            examplesCarousel = this.getExamplesCarousel();
-        this.loadExamples({
-            parent: category
-        }, function(store, records) {
-            var data = store.getData();
-            examplesList.setData(data);
-            examplesCarousel.setData(data);
+        var examplesStore = Ext.getStore('Examples'),
+            examplesList = this.getExamplesList(),
+            exampleView = this.getExampleView() || Ext.create('App.view.Examples');
+        examplesStore.clearFilter();
+        examplesStore.filterBy(function(record) {
+            return Number(record.get('category')) == Number(category);
         });
-    },
-    loadExamples: function(params, successCallback, errorCallback) {
-        var params = params || {},
-            examplesStore = Ext.getStore('Examples');
-        examplesStore.getProxy().setExtraParams(params);
-        examplesStore.on('load', function(store, records, successful) {
-            if (!successful) {
-                errorCallback && errorCallback();
-                return;
-            }
-            //console.log(records);
-            successCallback && successCallback(store, records);
-        }, this, {
-            single: true
-        });
-        examplesStore.load();
+        examplesList.setData(examplesStore.getData());
     },
     showExample: function(id) {
         console.log('show example id ' + id);
         var exampleView = this.getExampleView() || Ext.create('App.view.Examples'),
             examplesCarousel = this.getExamplesCarousel(),
-            data = examplesCarousel.getData(),
+            examplesStore = Ext.getStore('Examples'),
+            data = examplesStore.getData(),
             records = data && data.getRange();
         if (Ext.isEmpty(records)) {
             console.error('Empty carousel data!');
@@ -59963,7 +60049,8 @@ Ext.define('App.controller.Library', {
             currentIndex = 0;
         Ext.Array.each(records, function(record, index) {
             items.push({
-                xtype: 'image'
+                xtype: 'examplescarouselitem',
+                data: record.data
             });
             if (record.data.id == id)  {
                 currentIndex = index;
@@ -59974,23 +60061,59 @@ Ext.define('App.controller.Library', {
         examplesCarousel.setActiveItem(currentIndex);
         Ext.Viewport.setActiveItem(exampleView);
     },
-    onFavoriteButton: function() {
-        console.log('tap favorite');
+    onCarouselActiveItemChange: function(carousel, item, oldItem, eOpts) {
+        //console.log('activeitemchange');
+        var data = item.getData(),
+            favoriteButton = this.getFavoriteButton(),
+            user = Ext.getStore('Users').getAt(0),
+            userFavorite = user.get('favorite') || [];
+        //console.log(userFavorite);
+        if (userFavorite.indexOf(Number(data.id)) > -1) {
+            favoriteButton.addCls('added');
+        } else {
+            favoriteButton.removeCls('added');
+        }
     },
-    // Add to favorite
+    onFavoriteButton: function(button) {
+        //console.log('tap favorite');
+        var user = Ext.getStore('Users').getAt(0),
+            userFavorite = user.get('favorite') || [],
+            examplesCarousel = this.getExamplesCarousel(),
+            activeItem = examplesCarousel.getActiveItem(),
+            data = activeItem.getData(),
+            exampleId = Number(data.id);
+        //console.log(data);
+        if (userFavorite.indexOf(exampleId) > -1) {
+            userFavorite = Ext.Array.remove(userFavorite, exampleId);
+            button.removeCls('added');
+        } else {
+            userFavorite.push(exampleId);
+            button.addCls('added');
+        }
+        user.set('favorite', null);
+        user.set('favorite', userFavorite);
+    },
     onFacebookButton: function() {
-        console.log('tap facebook');
+        //console.log('tap facebook');
+        var examplesCarousel = this.getExamplesCarousel(),
+            activeItem = examplesCarousel.getActiveItem(),
+            data = activeItem.getData();
+        if (data.uri) {
+            var url = 'http://ukr-mova.in.ua/' + data.uri;
+            url = 'http://www.facebook.com/share.php?u=' + encodeURIComponent(url);
+            console.log(url);
+            window.open(url, '_system');
+        }
     }
 });
-// Add to facebook
 
 Ext.define('App.view.Favorite', {
     extend: 'Ext.Container',
     xtype: 'favorite',
     config: {
         fullscreen: true,
-        styleHtmlContent: true,
-        cls: 'x-view-favorite',
+        cls: 'x-view-examples',
+        layout: 'fit',
         items: [
             {
                 xtype: 'titlebar',
@@ -60013,10 +60136,7 @@ Ext.define('App.view.Favorite', {
                 ]
             },
             {
-                xtype: 'button',
-                ui: 'action',
-                action: 'delete',
-                text: 'Test Ext.Msg.confirm'
+                xtype: 'exampleslist'
             }
         ]
     }
@@ -60028,19 +60148,18 @@ Ext.define('App.controller.Favorite', {
         views: [
             'Favorite'
         ],
-        models: [],
-        stores: [],
         refs: {
             favoriteView: {
                 selector: 'favorite',
                 xtype: 'favorite',
                 autoCreate: true
             },
-            deleteButton: 'favorite button[action=delete]'
+            examplesList: 'favorite exampleslist'
         },
         control: {
-            deleteButton: {
-                tap: 'onDeleteButton'
+            examplesList: {
+                itemtap: 'onExamplesListTap',
+                icontap: 'onExamplesListIconTap'
             }
         },
         routes: {
@@ -60049,202 +60168,36 @@ Ext.define('App.controller.Favorite', {
     },
     showFavorite: function() {
         console.log('show favorite');
-        var favoriteView = this.getFavoriteView();
+        var favoriteView = this.getFavoriteView(),
+            user = Ext.getStore('Users').getAt(0),
+            userFavorite = user.get('favorite') || [];
         Ext.Viewport.setActiveItem(favoriteView);
+        var examplesStore = Ext.getStore('Examples'),
+            examplesList = this.getExamplesList();
+        examplesStore.clearFilter();
+        examplesStore.filterBy(function(record) {
+            return userFavorite.indexOf(Number(record.get('id'))) > -1;
+        }, this);
+        examplesList.setData(examplesStore.getData());
     },
-    onDeleteButton: function() {
+    onExamplesListTap: function(view, id) {
+        //console.log('tap list item');
+        this.redirectTo('library/example/' + id);
+    },
+    onExamplesListIconTap: function(view, id) {
+        //console.log('tap delete');
+        var exampleId = Number(id);
         Ext.Msg.confirm('Видалити?', null, function(buttonId) {
             console.log(buttonId);
-            if (buttonId == 'ok') {}
-        });
-    }
-});
-
-Ext.define('App.view.About', {
-    extend: 'Ext.Container',
-    xtype: 'about',
-    config: {
-        fullscreen: true,
-        scrollable: 'vertical',
-        styleHtmlContent: true,
-        items: [
-            {
-                xtype: 'titlebar',
-                docked: 'top',
-                ui: 'main',
-                title: 'Про нас',
-                items: [
-                    {
-                        xtype: 'button',
-                        iconCls: 'menu',
-                        align: 'left',
-                        action: 'leftmenu'
-                    },
-                    {
-                        xtype: 'button',
-                        iconCls: 'home',
-                        align: 'right',
-                        action: 'home'
-                    }
-                ]
-            },
-            {
-                xtype: 'image',
-                src: 'resources/images/logo-about@2x.png',
-                height: '120px'
-            },
-            {
-                xtype: 'panel',
-                style: 'font-size: 20px; padding: 10px 20px 0 20px;',
-                html: '<div class="text_block"><p>Освітній проект для тих, хто хоче вдосконалити свої знання української мови;</p><p>- спроба трьох небайдужих людей поділитися закоханістю в рідну мову;</p><p>- мрія про те, що колись в Україні буде модно знати декілька мов, а говорити українською.</p><p>&nbsp;</p><p>Нас часто запитують про кількість людей у команді, уявляючи штат із десятка філологів і дизайнерів. Насправді нас усього троє.</p></div>'
+            if (buttonId == 'yes') {
+                var user = Ext.getStore('Users').getAt(0),
+                    userFavorite = user.get('favorite') || [];
+                userFavorite = Ext.Array.remove(userFavorite, exampleId);
+                user.set('favorite', null);
+                user.set('favorite', userFavorite);
+                this.showFavorite();
             }
-        ]
-    }
-});
-
-Ext.define('App.controller.About', {
-    extend: 'Ext.app.Controller',
-    config: {
-        views: [
-            'About'
-        ],
-        models: [],
-        stores: [],
-        refs: {
-            aboutView: {
-                selector: 'about',
-                xtype: 'about',
-                autoCreate: true
-            }
-        },
-        control: {},
-        routes: {
-            'about': 'showAbout'
-        }
-    },
-    showAbout: function() {
-        console.log('show about');
-        var aboutView = this.getAboutView();
-        Ext.Viewport.setActiveItem(aboutView);
-    }
-});
-
-Ext.define('App.view.Out', {
-    extend: 'Ext.Container',
-    xtype: 'out',
-    config: {
-        fullscreen: true,
-        styleHtmlContent: true,
-        items: [
-            {
-                xtype: 'titlebar',
-                docked: 'top',
-                ui: 'main',
-                title: 'Вихід',
-                items: [
-                    {
-                        xtype: 'button',
-                        iconCls: 'menu',
-                        align: 'left',
-                        action: 'leftmenu'
-                    },
-                    {
-                        xtype: 'button',
-                        iconCls: 'home',
-                        align: 'right',
-                        action: 'home'
-                    }
-                ]
-            }
-        ]
-    }
-});
-
-Ext.define('App.controller.Out', {
-    extend: 'Ext.app.Controller',
-    config: {
-        views: [
-            'Out'
-        ],
-        models: [],
-        stores: [],
-        refs: {
-            outView: {
-                selector: 'out',
-                xtype: 'out',
-                autoCreate: true
-            }
-        },
-        control: {},
-        routes: {
-            'out': 'showOut'
-        }
-    },
-    showOut: function() {
-        console.log('show out');
-        console.log('tap logout');
-        var me = this,
-            usersStore = Ext.getStore('Users');
-        usersStore.removeAll();
-        me.redirectTo('login');
-    }
-});
-
-Ext.define('App.view.Settings', {
-    extend: 'Ext.Container',
-    xtype: 'settings',
-    config: {
-        fullscreen: true,
-        styleHtmlContent: true,
-        items: [
-            {
-                xtype: 'titlebar',
-                docked: 'top',
-                ui: 'main',
-                title: 'Налаштування',
-                items: [
-                    {
-                        xtype: 'button',
-                        iconCls: 'menu',
-                        align: 'left',
-                        action: 'leftmenu'
-                    },
-                    {
-                        xtype: 'button',
-                        iconCls: 'home',
-                        align: 'right',
-                        action: 'home'
-                    }
-                ]
-            }
-        ]
-    }
-});
-
-Ext.define('App.controller.Settings', {
-    extend: 'Ext.app.Controller',
-    config: {
-        views: [
-            'Settings'
-        ],
-        models: [],
-        stores: [],
-        refs: {
-            settingsView: {
-                selector: 'settings',
-                xtype: 'settings',
-                autoCreate: true
-            }
-        },
-        control: {},
-        routes: {
-            'settings': 'showSettings'
-        }
-    },
-    showSettings: function() {
-        console.log('show settings');
-        var settingsView = this.getSettingsView();
-        Ext.Viewport.setActiveItem(settingsView);
+        }, this);
     }
 });
 
@@ -60253,8 +60206,7 @@ Ext.define('App.model.Trening', {
     config: {
         fields: [
             'id',
-            'pagetitle',
-            'alias',
+            'title',
             'image'
         ]
     }
@@ -60373,7 +60325,7 @@ Ext.define('App.view.TreningsList', {
         loadingText: 'Загрузка...',
         emptyText: 'Товаров не найдено',
         cls: 'x-treningslist',
-        tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image:url({data.image:this.getUrl});{imageCss}><img src="{data.image:this.getUrl}" /></div>', '<div class="name">{data.pagetitle}</div>', '</div>', '</tpl>', {
+        tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image:url({data.image:this.getUrl});{imageCss}><img src="{data.image:this.getUrl}" /></div>', '<div class="name">{data.title}</div>', '</div>', '</tpl>', {
             getUrl: function(name) {
                 return App.config.Main.getImageUrl() + name;
             }
@@ -60900,6 +60852,133 @@ Ext.define('App.controller.Trening', {
     }
 });
 
+Ext.define('App.view.Settings', {
+    extend: 'Ext.Container',
+    xtype: 'settings',
+    config: {
+        fullscreen: true,
+        styleHtmlContent: true,
+        items: [
+            {
+                xtype: 'titlebar',
+                docked: 'top',
+                ui: 'main',
+                title: 'Налаштування',
+                items: [
+                    {
+                        xtype: 'button',
+                        iconCls: 'menu',
+                        align: 'left',
+                        action: 'leftmenu'
+                    },
+                    {
+                        xtype: 'button',
+                        iconCls: 'home',
+                        align: 'right',
+                        action: 'home'
+                    }
+                ]
+            }
+        ]
+    }
+});
+
+Ext.define('App.controller.Settings', {
+    extend: 'Ext.app.Controller',
+    config: {
+        views: [
+            'Settings'
+        ],
+        models: [],
+        stores: [],
+        refs: {
+            settingsView: {
+                selector: 'settings',
+                xtype: 'settings',
+                autoCreate: true
+            }
+        },
+        control: {},
+        routes: {
+            'settings': 'showSettings'
+        }
+    },
+    showSettings: function() {
+        console.log('show settings');
+        var settingsView = this.getSettingsView();
+        Ext.Viewport.setActiveItem(settingsView);
+    }
+});
+
+Ext.define('App.view.About', {
+    extend: 'Ext.Container',
+    xtype: 'about',
+    config: {
+        fullscreen: true,
+        scrollable: 'vertical',
+        styleHtmlContent: true,
+        items: [
+            {
+                xtype: 'titlebar',
+                docked: 'top',
+                ui: 'main',
+                title: 'Про нас',
+                items: [
+                    {
+                        xtype: 'button',
+                        iconCls: 'menu',
+                        align: 'left',
+                        action: 'leftmenu'
+                    },
+                    {
+                        xtype: 'button',
+                        iconCls: 'home',
+                        align: 'right',
+                        action: 'home'
+                    }
+                ]
+            },
+            {
+                xtype: 'image',
+                src: 'resources/images/logo-about@2x.png',
+                height: '120px'
+            },
+            {
+                xtype: 'panel',
+                style: 'font-size: 20px; padding: 10px 20px 0 20px;',
+                html: '<div class="text_block"><p>Освітній проект для тих, хто хоче вдосконалити свої знання української мови;</p><p>- спроба трьох небайдужих людей поділитися закоханістю в рідну мову;</p><p>- мрія про те, що колись в Україні буде модно знати декілька мов, а говорити українською.</p><p>&nbsp;</p><p>Нас часто запитують про кількість людей у команді, уявляючи штат із десятка філологів і дизайнерів. Насправді нас усього троє.</p></div>'
+            }
+        ]
+    }
+});
+
+Ext.define('App.controller.About', {
+    extend: 'Ext.app.Controller',
+    config: {
+        views: [
+            'About'
+        ],
+        models: [],
+        stores: [],
+        refs: {
+            aboutView: {
+                selector: 'about',
+                xtype: 'about',
+                autoCreate: true
+            }
+        },
+        control: {},
+        routes: {
+            'about': 'showAbout'
+        }
+    },
+    showAbout: function() {
+        console.log('show about');
+        var aboutView = this.getAboutView();
+        Ext.Viewport.setActiveItem(aboutView);
+    }
+});
+
 /*
     This file is generated and updated by Sencha Cmd. You can edit this file as
     needed for your application, but these edits will have to be merged by
@@ -60911,29 +60990,21 @@ Ext.define('App.controller.Trening', {
     changes and its generated code, it will produce a "merge conflict" that you
     will need to resolve manually.
 */
-Ext.Loader.setPath({
-    'Ext.ux': './ux'
-});
-// add Ext.ux.* class path
 Ext.application({
     name: 'App',
-    views: [],
     controllers: [
         'Main',
         'Login',
         'Home',
         'Library',
         'Favorite',
-        'About',
-        'Out',
+        'Trening',
         'Settings',
-        'Trening'
+        'About'
     ],
-    models: [],
-    stores: [],
     launch: function() {}
 });
 
 // @tag full-page
-// @require C:\Users\Halyna\Documents\sashklym\Mova\app\app.js
+// @require C:\Users\sashklym\MovaApp\app\app.js
 
