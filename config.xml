@@ -95,7 +95,6 @@
     </gap:plugin>
 
 <!--    <gap:plugin name="com.andycorman.cordova.inappbrowser" version="1.2" />-->
-      <gap:plugin name="org.li8.inappbrowser" version="0.1" />
 
     <!--
         Icon

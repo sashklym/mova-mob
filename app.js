@@ -59083,17 +59083,11 @@ Ext.define('App.controller.Login', {
     },
     onRegButton: function(button) {
         console.log('onRegButton');
-        //        var ref = cordova.InAppBrowser.open('http://ukr-mova.in.ua/authorization', '_blank', 'location=yes');
-        //        ref.addEventListener('loadstart', function(event) { alert(event.url); });
-        //        //ref.addEventListener('exit', function(event) { alert(event.url); });
-        var ref = window.open('http://ukr-mova.in.ua/authorization', '_blank', 'location=yes');
-        var myCallback = function() {
-                alert(event.url);
-            };
-        ref.addEventListener('loadstart', myCallback);
-        ref.removeEventListener('loadstart', myCallback);
     }
 });
+//        var ref = cordova.InAppBrowser.open('http://ukr-mova.in.ua/authorization', '_blank', 'location=yes');
+//        ref.addEventListener('loadstart', function(event) { alert(event.url); });
+//        //ref.addEventListener('exit', function(event) { alert(event.url); });
 
 Ext.define('App.view.Home', {
     extend: 'Ext.Container',
