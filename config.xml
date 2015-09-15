@@ -94,7 +94,7 @@
       <param name="REVERSED_CLIENT_ID" value="com.googleusercontent.apps.73453093308-ikfohjlm89d14vssj0ukrpol5ttvcjhk" />
     </gap:plugin>
 
-    <gap:plugin name="com.andycorman.cordova.inappbrowser" version="1.2" source="npm"/>
+    <gap:plugin name="com.andycorman.cordova.inappbrowser" version="1.2"/>
 
 
     <!--
