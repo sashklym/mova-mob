@@ -59048,14 +59048,15 @@ Ext.define('App.controller.Login', {
         var me = this,
             usersStore = Ext.getStore('Users'),
             user;
-        function loginBysoc(id, provider, email) {
+        function loginBysoc(id, provider, email, accessToken) {
             Ext.Ajax.request({
                 method: 'POST',
                 url: App.config.Main.getApiUrl() + 'loginBysoc',
                 params: {
                     id_user: id,
                     provider: provider,
-                    email: email
+                    email: email,
+                    accessToken: accessToken
                 },
                 withCredentials: false,
                 success: function(response) {
