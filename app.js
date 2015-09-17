@@ -58581,13 +58581,37 @@ Ext.define('App.util.Sync', {
             }
         });
         return maxId;
+    },
+    downloadFile: function(link, successCb, errorCb) {
+        var filename = link && link.substring(link.lastIndexOf('/') + 1);
+        if (!filename || filename.indexOf('/') > -1) {
+            errorCb && errorCb('Bad file url ' + link);
+            return;
+        }
+        // DEBUG: Fallback to remote file url
+        if (typeof cordova == 'undefined') {
+            successCb(link);
+            return;
+        }
+        var fileTransfer = new FileTransfer(),
+            uri = encodeURI(link),
+            fileUrl = cordova.file.dataDirectory + filename;
+        fileTransfer.download(link, fileUrl, function(entry) {
+            //console.log("download complete: " + entry.toURL());
+            successCb(entry.toURL());
+        }, function(error) {
+            //console.log("download error source " + error.source);
+            //console.log("download error target " + error.target);
+            //console.log("upload error code" + error.code);
+            errorCb && errorCb(error);
+        });
     }
 });
 
 Ext.define('App.model.User', {
     extend: 'Ext.data.Model',
     config: {
-        idProperty: 'internalId',
+        idProperty: '_id',
         identifier: 'uuid',
         fields: [
             'id',
@@ -59083,11 +59107,18 @@ Ext.define('App.controller.Login', {
     },
     onRegButton: function(button) {
         console.log('onRegButton');
+        //var ref = cordova.InAppBrowser.open('http://ukr-mova.in.ua/authorization', '_blank', 'location=yes');
+        //        ref.addEventListener('loadstart', function(event) { alert(event.url); });
+        //        //ref.addEventListener('exit', function(event) { alert(event.url); });
+        window.open('http://ukr-mova.in.ua/reestracziya-profilya', '_blank', [
+            'location=no',
+            'disallowoverscroll=yes',
+            'enableViewportScale=no',
+            'mediaPlaybackRequiresUserAction=no',
+            'allowInlineMediaPlayback=yes'
+        ].join(','));
     }
 });
-//        var ref = cordova.InAppBrowser.open('http://ukr-mova.in.ua/authorization', '_blank', 'location=yes');
-//        ref.addEventListener('loadstart', function(event) { alert(event.url); });
-//        //ref.addEventListener('exit', function(event) { alert(event.url); });
 
 Ext.define('App.view.Home', {
     extend: 'Ext.Container',
@@ -59207,13 +59238,15 @@ Ext.define('App.controller.Home', {
 Ext.define('App.model.Example', {
     extend: 'Ext.data.Model',
     config: {
-        idProperty: 'internalId',
+        idProperty: '_id',
         identifier: 'uuid',
         fields: [
             'id',
             'title',
             'image',
+            'imageCache',
             'thumb',
+            'thumbCache',
             'category',
             'uri'
         ]
@@ -59223,7 +59256,7 @@ Ext.define('App.model.Example', {
 Ext.define('App.model.Category', {
     extend: 'Ext.data.Model',
     config: {
-        idProperty: 'internalId',
+        idProperty: '_id',
         identifier: 'uuid',
         fields: [
             'id',
@@ -59871,6 +59904,7 @@ Ext.define('App.view.ExamplesCarouselItem', {
     config: {
         cls: 'x-examples-carousel-item',
         layout: 'fit',
+        record: null,
         items: {
             xtype: 'image'
         }
@@ -59884,16 +59918,32 @@ Ext.define('App.view.ExamplesCarouselItem', {
     onPainted: function(element) {
         //console.log('painted');
         var image = this.down('image'),
-            data = this.getData(),
-            imageSrc = App.config.Main.getImageUrl() + data.image;
-        //console.log(data);
-        this.mask({
-            xtype: 'loadmask',
-            transparent: true,
-            message: ''
-        });
-        image.on('load', this.onImageLoad, this);
-        image.setSrc(imageSrc);
+            example = this.getRecord(),
+            exampleData = example.getData();
+        //console.log(exampleData);
+        if (exampleData.imageCache) {
+            image.setSrc(exampleData.imageCache);
+        } else {
+            var imageSrc = App.config.Main.getImageUrl() + exampleData.image;
+            this.mask({
+                xtype: 'loadmask',
+                transparent: true,
+                message: ''
+            });
+            image.on('load', this.onImageLoad, this);
+            // Download and save image localy
+            App.util.Sync.downloadFile(imageSrc, function(src) {
+                //console.log(src);
+                // Save image url
+                example.set('imageCache', src);
+                // Show local image
+                image.setSrc(src);
+            }, function(error) {
+                console.error(error);
+                // Show remote image
+                image.setSrc(imageSrc);
+            });
+        }
     },
     onImageLoad: function() {
         //console.log('load');
@@ -60045,7 +60095,7 @@ Ext.define('App.controller.Library', {
         Ext.Array.each(records, function(record, index) {
             items.push({
                 xtype: 'examplescarouselitem',
-                data: record.data
+                record: record
             });
             if (record.data.id == id)  {
                 currentIndex = index;
@@ -60056,14 +60106,15 @@ Ext.define('App.controller.Library', {
         examplesCarousel.setActiveItem(currentIndex);
         Ext.Viewport.setActiveItem(exampleView);
     },
-    onCarouselActiveItemChange: function(carousel, item, oldItem, eOpts) {
+    onCarouselActiveItemChange: function(carousel, newItem, oldItem, eOpts) {
         //console.log('activeitemchange');
-        var data = item.getData(),
+        var example = newItem.getRecord(),
+            exampleId = example.get('id'),
             favoriteButton = this.getFavoriteButton(),
             user = Ext.getStore('Users').getAt(0),
             userFavorite = user.get('favorite') || [];
         //console.log(userFavorite);
-        if (userFavorite.indexOf(Number(data.id)) > -1) {
+        if (userFavorite.indexOf(exampleId) > -1) {
             favoriteButton.addCls('added');
         } else {
             favoriteButton.removeCls('added');
@@ -60075,8 +60126,8 @@ Ext.define('App.controller.Library', {
             userFavorite = user.get('favorite') || [],
             examplesCarousel = this.getExamplesCarousel(),
             activeItem = examplesCarousel.getActiveItem(),
-            data = activeItem.getData(),
-            exampleId = Number(data.id);
+            example = activeItem.getRecord(),
+            exampleId = example.get('id');
         //console.log(data);
         if (userFavorite.indexOf(exampleId) > -1) {
             userFavorite = Ext.Array.remove(userFavorite, exampleId);
@@ -60085,16 +60136,18 @@ Ext.define('App.controller.Library', {
             userFavorite.push(exampleId);
             button.addCls('added');
         }
+        // FIX: Must be set to null when updating encoded fields
         user.set('favorite', null);
         user.set('favorite', userFavorite);
     },
-    onFacebookButton: function() {
+    onFacebookButton: function(button) {
         //console.log('tap facebook');
         var examplesCarousel = this.getExamplesCarousel(),
             activeItem = examplesCarousel.getActiveItem(),
-            data = activeItem.getData();
-        if (data.uri) {
-            var url = 'http://ukr-mova.in.ua/' + data.uri;
+            example = activeItem.getRecord(),
+            exampleUri = example.get('uri');
+        if (exampleUri) {
+            var url = 'http://ukr-mova.in.ua/' + exampleUri;
             url = 'http://www.facebook.com/share.php?u=' + encodeURIComponent(url);
             console.log(url);
             window.open(url, '_system');
