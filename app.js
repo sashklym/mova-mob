@@ -7,6 +7,9 @@ if (!App.override.viewport) App.override.viewport = {};
 if (!App.store) App.store = {};
 if (!App.util) App.util = {};
 if (!App.view) App.view = {};
+if (!App.view.library) App.view.library = {};
+if (!App.view.trening) App.view.trening = {};
+if (!App.view.user) App.view.user = {};
 var Ext = Ext || {};
 if (!Ext.Carousel) Ext.Carousel = {};
 if (!Ext.app) Ext.app = {};
@@ -58629,14 +58632,6 @@ Ext.define('App.model.User', {
     }
 });
 
-Ext.define('App.view.Main', {
-    extend: 'Ext.Container',
-    xtype: 'main',
-    config: {
-        items: []
-    }
-});
-
 Ext.define('App.view.LeftMenu', {
     extend: 'Ext.Menu',
     xtype: 'leftmenu',
@@ -58666,7 +58661,7 @@ Ext.define('App.view.LeftMenu', {
             },
             {
                 text: 'Вибране',
-                action: 'favorite',
+                action: 'library/examples/favorite',
                 iconCls: 'favorite'
             },
             {
@@ -58680,6 +58675,96 @@ Ext.define('App.view.LeftMenu', {
                 action: 'logout'
             }
         ]
+    }
+});
+
+Ext.define('App.view.DataList', {
+    extend: 'Ext.Container',
+    xtype: 'datalist',
+    config: {
+        data: null,
+        dataId: null,
+        records: null,
+        baseCls: 'x-datalist',
+        emptyText: 'Empty',
+        loadingText: 'Loading...',
+        scrollable: 'vertical'
+    },
+    initialize: function() {
+        this.callParent();
+        this.element.on('tap', 'onItemTap', this);
+        var scroller = this.getScrollable().getScroller();
+        scroller.on('scrollend', 'onScrollEnd', this);
+    },
+    applyData: function(data) {
+        //console.log('apply data');
+        if (Ext.isEmpty(data) || Ext.isEmpty(data.items)) {
+            this.setRecords(null);
+            this.showEmptyText();
+            return data;
+        }
+        //console.log(data.items);
+        if (Ext.isEmpty(data.items)) {
+            this.setRecords(null);
+            this.showEmptyText();
+        } else {
+            this.setRecords(data.items);
+            this.hideEmptyText();
+            var scroller = this.getScrollable().getScroller();
+            scroller.scrollToTop();
+        }
+        return {
+            items: data.items,
+            extra: data.extra || {}
+        };
+    },
+    onItemTap: function(e) {
+        //console.log('tap');
+        var targetEl = Ext.get(e.target),
+            itemEl = targetEl.hasCls('item') ? targetEl : targetEl.parent('.item');
+        if (!itemEl) {
+            return;
+        }
+        var index = this.getViewItems().indexOf(itemEl.dom),
+            records = this.getRecords(),
+            record = records && records[index];
+        this.fireEvent('itemtap', this, index, targetEl, record, e);
+    },
+    // Transform ChildNodes into a proper Array so we can do indexOf...
+    getViewItems: function() {
+        return Array.prototype.slice.call(this.element.query('.item'));
+    },
+    onScrollEnd: function(scroller, x, y) {
+        console.log(y);
+    },
+    //console.log(scroller.maxPosition.y);
+    updateEmptyText: function(newEmptyText, oldEmptyText) {
+        var me = this;
+        if (oldEmptyText && me.emptyTextCmp) {
+            me.remove(me.emptyTextCmp, true);
+            delete me.emptyTextCmp;
+        }
+        if (newEmptyText) {
+            me.emptyTextCmp = me.add({
+                xtype: 'component',
+                cls: 'emptytext',
+                html: newEmptyText,
+                hidden: true
+            });
+            if (Ext.isEmpty(me.getRecords())) {
+                this.showEmptyText();
+            }
+        }
+    },
+    showEmptyText: function() {
+        if (this.getEmptyText()) {
+            this.emptyTextCmp.show();
+        }
+    },
+    hideEmptyText: function() {
+        if (this.getEmptyText()) {
+            this.emptyTextCmp.hide();
+        }
     }
 });
 
@@ -58700,8 +58785,8 @@ Ext.define('App.controller.Main', {
     extend: 'Ext.app.Controller',
     config: {
         views: [
-            'Main',
-            'LeftMenu'
+            'LeftMenu',
+            'DataList'
         ],
         models: [
             'User'
@@ -58886,7 +58971,7 @@ Ext.define('App.controller.Main', {
     }
 });
 
-Ext.define('App.view.Login', {
+Ext.define('App.view.user.Login', {
     extend: 'Ext.Container',
     xtype: 'login',
     config: {
@@ -58981,7 +59066,7 @@ Ext.define('App.controller.Login', {
     extend: 'Ext.app.Controller',
     config: {
         views: [
-            'Login'
+            'user.Login'
         ],
         refs: {
             loginView: {
@@ -59271,250 +59356,7 @@ Ext.define('App.model.Category', {
     }
 });
 
-Ext.define('App.view.CategoriesList', {
-    extend: 'Ext.Container',
-    xtype: 'categorieslist',
-    config: {
-        scrollable: 'vertical',
-        store: 'Categories',
-        loadingText: 'Загрузка...',
-        emptyText: 'Товаров не найдено',
-        cls: 'x-categorieslist',
-        tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image:url({data.image:this.getUrl});{imageCss}><img src="{data.image:this.getUrl}" /></div>', '<div class="name">{data.title}</div>', '</div>', '</tpl>', {
-            getUrl: function(name) {
-                return App.config.Main.getImageUrl() + name;
-            }
-        })
-    },
-    //    storeEventHooks: {
-    //        beforeload: 'onBeforeLoad',
-    //        load: 'onLoad'
-    //    },
-    initialize: function() {
-        this.callParent();
-        //var scroller = this.getScrollable().getScroller();
-        //scroller.on('scrollend', 'onScrollEnd', this);
-        this.element.on('tap', 'onTap', this);
-    },
-    onTap: function(e) {
-        //console.log('tap');
-        var element = Ext.get(e.target),
-            fireEvent, id;
-        if (element.hasCls('item') || element.parent('.item')) {
-            fireEvent = 'itemtap';
-        }
-        if (!element.hasCls('item')) {
-            element = element.parent('.item');
-        }
-        id = element.getAttribute('ref');
-        if (fireEvent) {
-            this.fireEvent(fireEvent, this, id, element);
-        }
-    }
-});
-//    onScrollEnd: function(scroller, x, y) {
-//        if (y >= scroller.maxPosition.y && this.storeFullyLoaded()) {
-//            this.getStore().nextPage({ addRecords: true });
-//        }
-//    },
-//
-//    refresh: function() {
-//        var store = this.getStore(),
-//            data = store.getData(),
-//            scroller = this.getScrollable().getScroller();
-//
-//        //console.log('refresh');
-//
-//        if(store.currentPage == 1) {
-//            scroller.scrollTo(0, 0);
-//        }
-//
-//        // Set data
-//        this.setData({
-//            extra: this.getExtraData(),
-//            items: data.items
-//        });
-//
-//    },
-//
-//    onBeforeLoad: function() {
-//        var loadingText = this.getLoadingText();
-//        if (loadingText && this.isPainted()) {
-//            if(Ext.os.is.Android) {
-//                //Ext.getCmp('loading').show();
-//            } else {
-//                this.setMasked({
-//                    xtype: 'loadmask',
-//                    message: loadingText
-//                });
-//            }
-//        }
-//
-//        this.hideEmptyText();
-//    },
-//
-//    onLoad: function(store, records, successful) {
-//        console.log('load store productslist');
-//        //remove any masks on the store
-//        this.hasLoadedStore = true;
-//        this.setMasked(false);
-//        Ext.getCmp('loading').hide();
-//
-//        // Remove buttons
-//        this.remove(this.btnLoadNext);
-//        this.remove(this.btnLoadPrevious);
-//
-//        if (!store.getCount()) {
-//            this.showEmptyText();
-//            return;
-//        }
-//
-//        if(!successful) {
-//            return;
-//        }
-//
-//        this.refresh();
-//
-//        var sectionsStore = Ext.getStore('Sections'),
-//            nextSection = null,
-//            previousSection = null,
-//            proxy = store.getProxy(),
-//            params = (store.getStoreId() != 'Cart') && proxy.getExtraParams();
-//
-//        if(params && params.category && params.category != 'search') {
-//            previousSection = sectionsStore.findPreviousChild('alias', params.category);
-//            nextSection = sectionsStore.findNextChild('alias', params.category);
-//        }
-//
-//        if(previousSection) {
-//            this.btnLoadPrevious = this.insert(0, {
-//                xtype: 'button',
-//                ui: 'action',
-//                text: '<<< ' + previousSection.get('name'),
-//                style: 'width: 230px; margin: .5em auto 0 auto;',
-//                handler: function(){
-//                    //console.log('tap load next');
-//                    window.location.hash = 'products/' + previousSection.get('alias');
-//                }
-//            });
-//        }
-//
-//        if(nextSection) {
-//            this.btnLoadNext = this.add({
-//                xtype: 'button',
-//                ui: 'action',
-//                text: nextSection.get('name') + ' >>>',
-//                style: 'width: 230px; margin: 0 auto;',
-//                handler: function(){
-//                    //console.log('tap load next');
-//                    window.location.hash = 'products/' + nextSection.get('alias');
-//                }
-//            });
-//        }
-//
-////        this.remove(this.btnLoadNext);
-////        // Add NEXT button
-////        if(records.length >= store.getPageSize()) {
-////            this.btnLoadNext = this.add({
-////                xtype: 'button',
-////                ui: 'action',
-////                text: 'Дальше',
-////                style: 'width: 100px; margin: 0 auto;',
-////                handler: function(){
-////                    //console.log('tap load next');
-////                    store.nextPage({ addRecords: true });
-////                }
-////            });
-////        }
-//    },
-//
-//    btnLoadNext: null,
-//    btnLoadPrevious: null,
-//
-//    /**
-//     * Method called when the Store's Reader throws an exception
-//     * @method handleException
-//     */
-//    handleException: function() {
-//        this.setMasked(false);
-//        Ext.getCmp('loading').hide();
-//    },
-//
-//    updateEmptyText: function(newEmptyText, oldEmptyText) {
-//        var me = this,
-//            store;
-//
-//        if (oldEmptyText && me.emptyTextCmp) {
-//            me.remove(me.emptyTextCmp, true);
-//            delete me.emptyTextCmp;
-//        }
-//
-//        if (newEmptyText) {
-//            me.emptyTextCmp = me.add({
-//                xtype: 'component',
-//                cls: 'emptytext',
-//                html: newEmptyText,
-//                hidden: true
-//            });
-//            store = me.getStore();
-//            if (store && me.hasLoadedStore && !store.getCount()) {
-//                this.showEmptyText();
-//            }
-//        }
-//    },
-//
-//    showEmptyText: function() {
-//        if (this.getEmptyText()) {
-//            this.emptyTextCmp.show();
-//        }
-//        this.setData(null);
-//    },
-//
-//    hideEmptyText: function() {
-//        if (this.getEmptyText()) {
-//            this.emptyTextCmp.hide();
-//        }
-//    },
-//
-//    applyStore: function(store) {
-//        var me = this,
-//            bindEvents = Ext.apply({}, me.storeEventHooks, { scope: me }),
-//            proxy, reader;
-//
-//        if (store) {
-//            store = Ext.data.StoreManager.lookup(store);
-//            if (store && Ext.isObject(store) && store.isStore) {
-//                store.on(bindEvents);
-//                proxy = store.getProxy();
-//                if (proxy) {
-//                    reader = proxy.getReader();
-//                    if (reader) {
-//                        reader.on('exception', 'handleException', this);
-//                    }
-//                }
-//            }
-//            //<debug warn>
-//            else {
-//                Ext.Logger.warn("The specified Store cannot be found", this);
-//            }
-//            //</debug>
-//        }
-//
-//        return store;
-//    },
-//
-//    storeFullyLoaded: function() {
-//        var store = this.getStore(),
-//            loaded = store.getCount(),
-//            total = store.getTotalCount();
-//        if(total) {
-//            return total <= (store.currentPage * store.getPageSize());
-//        }
-//
-//        return loaded == (store.currentPage * store.getPageSize());
-//    }
-
-Ext.define('App.view.Library', {
+Ext.define('App.view.library.Library', {
     extend: 'Ext.Container',
     xtype: 'library',
     config: {
@@ -59541,262 +59383,15 @@ Ext.define('App.view.Library', {
                 ]
             },
             {
-                xtype: 'categorieslist'
+                xtype: 'datalist',
+                ui: 'categories',
+                tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image:url(http://ukr-mova.in.ua/{data.image})"></div>', '<div class="name">{data.title}</div>', '</div>', '</tpl>')
             }
         ]
     }
 });
 
-Ext.define('App.view.ExamplesList', {
-    extend: 'Ext.Container',
-    xtype: 'exampleslist',
-    config: {
-        scrollable: 'vertical',
-        store: 'Examples',
-        loadingText: '',
-        emptyText: 'Прикладів не знайдено',
-        cls: 'x-exampleslist',
-        tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image: url({data.thumb:this.getUrl})">', '<div class="icon-remove">X</div>', '</div>', '</div>', '</tpl>', {
-            getUrl: function(name) {
-                return App.config.Main.getImageUrl() + name;
-            }
-        })
-    },
-    //    storeEventHooks: {
-    //        beforeload: 'onBeforeLoad',
-    //        load: 'onLoad'
-    //    },
-    initialize: function() {
-        this.callParent();
-        //var scroller = this.getScrollable().getScroller();
-        //scroller.on('scrollend', 'onScrollEnd', this);
-        this.element.on('tap', 'onTap', this);
-    },
-    onTap: function(e) {
-        //console.log('tap');
-        var element = Ext.get(e.target),
-            fireEvent, id;
-        if (element.hasCls('icon-remove')) {
-            var parent = element.parent('.item'),
-                id = parent.getAttribute('ref');
-            this.fireEvent('icontap', this, id, element);
-            return;
-        }
-        if (element.hasCls('item') || element.parent('.item')) {
-            fireEvent = 'itemtap';
-        }
-        if (!element.hasCls('item')) {
-            element = element.parent('.item');
-        }
-        id = element.getAttribute('ref');
-        if (fireEvent) {
-            this.fireEvent(fireEvent, this, id, element);
-        }
-    }
-});
-//    onScrollEnd: function(scroller, x, y) {
-//        if (y >= scroller.maxPosition.y && this.storeFullyLoaded()) {
-//            this.getStore().nextPage({ addRecords: true });
-//        }
-//    },
-//
-//    refresh: function() {
-//        var store = this.getStore(),
-//            data = store.getData(),
-//            scroller = this.getScrollable().getScroller();
-//
-//        //console.log('refresh');
-//
-//        if(store.currentPage == 1) {
-//            scroller.scrollTo(0, 0);
-//        }
-//
-//        // Set data
-//        this.setData({
-//            extra: this.getExtraData(),
-//            items: data.items
-//        });
-//
-//    },
-//
-//    onBeforeLoad: function() {
-//        var loadingText = this.getLoadingText();
-//        if (loadingText && this.isPainted()) {
-//            if(Ext.os.is.Android) {
-//                //Ext.getCmp('loading').show();
-//            } else {
-//                this.setMasked({
-//                    xtype: 'loadmask',
-//                    message: loadingText
-//                });
-//            }
-//        }
-//
-//        this.hideEmptyText();
-//    },
-//
-//    onLoad: function(store, records, successful) {
-//        console.log('load store productslist');
-//        //remove any masks on the store
-//        this.hasLoadedStore = true;
-//        this.setMasked(false);
-//        Ext.getCmp('loading').hide();
-//
-//        // Remove buttons
-//        this.remove(this.btnLoadNext);
-//        this.remove(this.btnLoadPrevious);
-//
-//        if (!store.getCount()) {
-//            this.showEmptyText();
-//            return;
-//        }
-//
-//        if(!successful) {
-//            return;
-//        }
-//
-//        this.refresh();
-//
-//        var sectionsStore = Ext.getStore('Sections'),
-//            nextSection = null,
-//            previousSection = null,
-//            proxy = store.getProxy(),
-//            params = (store.getStoreId() != 'Cart') && proxy.getExtraParams();
-//
-//        if(params && params.category && params.category != 'search') {
-//            previousSection = sectionsStore.findPreviousChild('alias', params.category);
-//            nextSection = sectionsStore.findNextChild('alias', params.category);
-//        }
-//
-//        if(previousSection) {
-//            this.btnLoadPrevious = this.insert(0, {
-//                xtype: 'button',
-//                ui: 'action',
-//                text: '<<< ' + previousSection.get('name'),
-//                style: 'width: 230px; margin: .5em auto 0 auto;',
-//                handler: function(){
-//                    //console.log('tap load next');
-//                    window.location.hash = 'products/' + previousSection.get('alias');
-//                }
-//            });
-//        }
-//
-//        if(nextSection) {
-//            this.btnLoadNext = this.add({
-//                xtype: 'button',
-//                ui: 'action',
-//                text: nextSection.get('name') + ' >>>',
-//                style: 'width: 230px; margin: 0 auto;',
-//                handler: function(){
-//                    //console.log('tap load next');
-//                    window.location.hash = 'products/' + nextSection.get('alias');
-//                }
-//            });
-//        }
-//
-////        this.remove(this.btnLoadNext);
-////        // Add NEXT button
-////        if(records.length >= store.getPageSize()) {
-////            this.btnLoadNext = this.add({
-////                xtype: 'button',
-////                ui: 'action',
-////                text: 'Дальше',
-////                style: 'width: 100px; margin: 0 auto;',
-////                handler: function(){
-////                    //console.log('tap load next');
-////                    store.nextPage({ addRecords: true });
-////                }
-////            });
-////        }
-//    },
-//
-//    btnLoadNext: null,
-//    btnLoadPrevious: null,
-//
-//    /**
-//     * Method called when the Store's Reader throws an exception
-//     * @method handleException
-//     */
-//    handleException: function() {
-//        this.setMasked(false);
-//        Ext.getCmp('loading').hide();
-//    },
-//
-//    updateEmptyText: function(newEmptyText, oldEmptyText) {
-//        var me = this,
-//            store;
-//
-//        if (oldEmptyText && me.emptyTextCmp) {
-//            me.remove(me.emptyTextCmp, true);
-//            delete me.emptyTextCmp;
-//        }
-//
-//        if (newEmptyText) {
-//            me.emptyTextCmp = me.add({
-//                xtype: 'component',
-//                cls: 'emptytext',
-//                html: newEmptyText,
-//                hidden: true
-//            });
-//            store = me.getStore();
-//            if (store && me.hasLoadedStore && !store.getCount()) {
-//                this.showEmptyText();
-//            }
-//        }
-//    },
-//
-//    showEmptyText: function() {
-//        if (this.getEmptyText()) {
-//            this.emptyTextCmp.show();
-//        }
-//        this.setData(null);
-//    },
-//
-//    hideEmptyText: function() {
-//        if (this.getEmptyText()) {
-//            this.emptyTextCmp.hide();
-//        }
-//    },
-//
-//    applyStore: function(store) {
-//        var me = this,
-//            bindEvents = Ext.apply({}, me.storeEventHooks, { scope: me }),
-//            proxy, reader;
-//
-//        if (store) {
-//            store = Ext.data.StoreManager.lookup(store);
-//            if (store && Ext.isObject(store) && store.isStore) {
-//                store.on(bindEvents);
-//                proxy = store.getProxy();
-//                if (proxy) {
-//                    reader = proxy.getReader();
-//                    if (reader) {
-//                        reader.on('exception', 'handleException', this);
-//                    }
-//                }
-//            }
-//            //<debug warn>
-//            else {
-//                Ext.Logger.warn("The specified Store cannot be found", this);
-//            }
-//            //</debug>
-//        }
-//
-//        return store;
-//    },
-//
-//    storeFullyLoaded: function() {
-//        var store = this.getStore(),
-//            loaded = store.getCount(),
-//            total = store.getTotalCount();
-//        if(total) {
-//            return total <= (store.currentPage * store.getPageSize());
-//        }
-//
-//        return loaded == (store.currentPage * store.getPageSize());
-//    }
-
-Ext.define('App.view.Examples', {
+Ext.define('App.view.library.Examples', {
     extend: 'Ext.Container',
     xtype: 'examples',
     config: {
@@ -59823,13 +59418,15 @@ Ext.define('App.view.Examples', {
                 ]
             },
             {
-                xtype: 'exampleslist'
+                xtype: 'datalist',
+                ui: 'examples',
+                tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item">', '<div class="image" style="background-image: url(http://ukr-mova.in.ua/{data.thumb})">', '{% if (parent.extra.favorite) { %}', '<div class="icon-remove">X</div>', '{% } %}', '</div>', '</div>', '</tpl>')
             }
         ]
     }
 });
 
-Ext.define('App.view.Example', {
+Ext.define('App.view.library.Example', {
     extend: 'Ext.Container',
     xtype: 'example',
     config: {
@@ -59903,7 +59500,7 @@ Ext.define('App.view.Example', {
     }
 });
 
-Ext.define('App.view.ExamplesCarouselItem', {
+Ext.define('App.view.library.ExamplesCarouselItem', {
     extend: 'Ext.Container',
     xtype: 'examplescarouselitem',
     config: {
@@ -59986,12 +59583,10 @@ Ext.define('App.controller.Library', {
     extend: 'Ext.app.Controller',
     config: {
         views: [
-            'Library',
-            'CategoriesList',
-            'Examples',
-            'ExamplesList',
-            'Example',
-            'ExamplesCarouselItem'
+            'library.Library',
+            'library.Examples',
+            'library.Example',
+            'library.ExamplesCarouselItem'
         ],
         models: [
             'Example',
@@ -60017,8 +59612,8 @@ Ext.define('App.controller.Library', {
                 xtype: 'example',
                 autoCreate: true
             },
-            categoriesList: 'library categorieslist',
-            examplesList: 'examples exampleslist',
+            categoriesList: 'library datalist',
+            examplesList: 'examples datalist',
             examplesCarousel: 'example carousel',
             backButtonExamples: 'examples button[action=back]',
             backButtonExample: 'example button[action=back]',
@@ -60053,37 +59648,82 @@ Ext.define('App.controller.Library', {
         var libraryView = this.getLibraryView();
         Ext.Viewport.setActiveItem(libraryView);
         var categotiesStore = Ext.getStore('Categories'),
+            categotiesData,
             categoriesList = this.getCategoriesList();
         categotiesStore.clearFilter();
-        categoriesList.setData(categotiesStore.getData());
+        categotiesData = categotiesStore.getData() , categoriesList.setData(categotiesData);
     },
-    onCategoriesListTap: function(view, id) {
+    onCategoriesListTap: function(view, index, targetEl, record, e) {
         console.log('tap list item');
+        var id = record && record.get('id');
         Ext.Viewport.getLayout().setAnimation({
             type: 'slide',
             direction: 'left'
         });
         this.redirectTo('library/examples/' + id);
     },
-    onExamplesListTap: function(view, id) {
+    showExamples: function(category) {
+        console.log('show examples category ' + category);
+        var examplesView = this.getExamplesView();
+        Ext.Viewport.setActiveItem(examplesView);
+        var examplesStore = Ext.getStore('Examples'),
+            examplesData,
+            examplesList = this.getExamplesList();
+        if (examplesList.getDataId() == category) {
+            console.log('skip');
+            return;
+        }
+        examplesStore.clearFilter();
+        switch (category) {
+            case 'favorite':
+                var user = Ext.getStore('Users').getAt(0),
+                    userFavorite = user.get('favorite') || [];
+                examplesStore.filterBy(function(record) {
+                    return userFavorite.indexOf(record.get('id')) > -1;
+                });
+                examplesData = examplesStore.getData();
+                examplesData.extra = {
+                    favorite: true
+                };
+                break;
+            default:
+                var categoryId = Number(category);
+                examplesStore.filterBy(function(record) {
+                    return record.get('category') == categoryId;
+                });
+                examplesData = examplesStore.getData();
+        }
+        examplesList.setData(examplesData);
+        examplesList.setDataId(category);
+    },
+    onExamplesListTap: function(view, index, targetEl, record, e) {
         console.log('tap list item');
+        var id = record && record.get('id');
+        if (targetEl.hasCls('icon-remove')) {
+            console.log('tap icon');
+            this.onExamplesListIconTap(view, id);
+            return;
+        }
         Ext.Viewport.getLayout().setAnimation({
             type: 'slide',
             direction: 'left'
         });
         this.redirectTo('library/example/' + id);
     },
-    showExamples: function(category) {
-        console.log('show examples category ' + category);
-        var examplesView = this.getExamplesView();
-        Ext.Viewport.setActiveItem(examplesView);
-        var examplesStore = Ext.getStore('Examples'),
-            examplesList = this.getExamplesList();
-        examplesStore.clearFilter();
-        examplesStore.filterBy(function(record) {
-            return Number(record.get('category')) == Number(category);
-        });
-        examplesList.setData(examplesStore.getData());
+    onExamplesListIconTap: function(view, id) {
+        //console.log('tap delete');
+        var exampleId = Number(id);
+        Ext.Msg.confirm('Видалити?', null, function(buttonId) {
+            console.log(buttonId);
+            if (buttonId == 'yes') {
+                var user = Ext.getStore('Users').getAt(0),
+                    userFavorite = user.get('favorite') || [];
+                userFavorite = Ext.Array.remove(userFavorite, exampleId);
+                user.set('favorite', null);
+                user.set('favorite', userFavorite);
+                this.showExamples('favorite');
+            }
+        }, this);
     },
     showExample: function(id) {
         console.log('show example id ' + id);
@@ -60161,98 +59801,6 @@ Ext.define('App.controller.Library', {
     }
 });
 
-Ext.define('App.view.Favorite', {
-    extend: 'Ext.Container',
-    xtype: 'favorite',
-    config: {
-        fullscreen: true,
-        cls: 'x-view-examples',
-        layout: 'fit',
-        items: [
-            {
-                xtype: 'titlebar',
-                docked: 'top',
-                ui: 'main',
-                title: 'Вибране',
-                items: [
-                    {
-                        align: 'left',
-                        iconCls: 'menu',
-                        ui: 'menu'
-                    },
-                    {
-                        align: 'right',
-                        iconCls: 'home',
-                        ui: 'home'
-                    }
-                ]
-            },
-            {
-                xtype: 'exampleslist'
-            }
-        ]
-    }
-});
-
-Ext.define('App.controller.Favorite', {
-    extend: 'Ext.app.Controller',
-    config: {
-        views: [
-            'Favorite'
-        ],
-        refs: {
-            favoriteView: {
-                selector: 'favorite',
-                xtype: 'favorite',
-                autoCreate: true
-            },
-            examplesList: 'favorite exampleslist'
-        },
-        control: {
-            examplesList: {
-                itemtap: 'onExamplesListTap',
-                icontap: 'onExamplesListIconTap'
-            }
-        },
-        routes: {
-            'favorite': 'showFavorite'
-        }
-    },
-    showFavorite: function() {
-        console.log('show favorite');
-        var favoriteView = this.getFavoriteView(),
-            user = Ext.getStore('Users').getAt(0),
-            userFavorite = user.get('favorite') || [];
-        Ext.Viewport.setActiveItem(favoriteView);
-        var examplesStore = Ext.getStore('Examples'),
-            examplesList = this.getExamplesList();
-        examplesStore.clearFilter();
-        examplesStore.filterBy(function(record) {
-            return userFavorite.indexOf(Number(record.get('id'))) > -1;
-        }, this);
-        examplesList.setData(examplesStore.getData());
-    },
-    onExamplesListTap: function(view, id) {
-        //console.log('tap list item');
-        this.redirectTo('library/example/' + id);
-    },
-    onExamplesListIconTap: function(view, id) {
-        //console.log('tap delete');
-        var exampleId = Number(id);
-        Ext.Msg.confirm('Видалити?', null, function(buttonId) {
-            console.log(buttonId);
-            if (buttonId == 'yes') {
-                var user = Ext.getStore('Users').getAt(0),
-                    userFavorite = user.get('favorite') || [];
-                userFavorite = Ext.Array.remove(userFavorite, exampleId);
-                user.set('favorite', null);
-                user.set('favorite', userFavorite);
-                this.showFavorite();
-            }
-        }, this);
-    }
-});
-
 Ext.define('App.model.Trening', {
     extend: 'Ext.data.Model',
     config: {
@@ -60264,7 +59812,7 @@ Ext.define('App.model.Trening', {
     }
 });
 
-Ext.define('App.view.TreningsList', {
+Ext.define('App.view.trening.TreningsList', {
     extend: 'Ext.Container',
     xtype: 'treningslist',
     config: {
@@ -60507,7 +60055,7 @@ Ext.define('App.view.TreningsList', {
 //        return loaded == (store.currentPage * store.getPageSize());
 //    }
 
-Ext.define('App.view.Trening', {
+Ext.define('App.view.trening.Trening', {
     extend: 'Ext.Container',
     xtype: 'trening',
     config: {
@@ -60541,7 +60089,7 @@ Ext.define('App.view.Trening', {
     }
 });
 
-Ext.define('App.view.Onetrening', {
+Ext.define('App.view.trening.Onetrening', {
     extend: 'Ext.Container',
     xtype: 'onetrening',
     config: {
@@ -60670,9 +60218,9 @@ Ext.define('App.controller.Trening', {
     extend: 'Ext.app.Controller',
     config: {
         views: [
-            'Trening',
-            'TreningsList',
-            'Onetrening'
+            'trening.Trening',
+            'trening.TreningsList',
+            'trening.Onetrening'
         ],
         models: [
             'Trening'
@@ -61037,7 +60585,6 @@ Ext.application({
         'Login',
         'Home',
         'Library',
-        'Favorite',
         'Trening',
         'Settings',
         'About'
