@@ -59157,7 +59157,7 @@ Ext.define('App.controller.Login', {
         var fbLoginSuccess = function(userData) {
                 //alert("UserInfo: " + JSON.stringify(userData));
                 if (userData.status === "connected") {
-                    loginBysoc(userData.authResponse.userID, 'Facebook', 'email', userData.authResponse.accessToken);
+                    me.loginBysoc(userData.authResponse.userID, 'Facebook', 'email', userData.authResponse.accessToken);
                 } else {
                     Ext.Msg.alert('Помилка', '');
                 }
@@ -59171,7 +59171,7 @@ Ext.define('App.controller.Login', {
         window.plugins.googleplus.login({}, function(obj) {
             alert(JSON.stringify(obj));
             // do something useful instead of alerting
-            loginBysoc(obj.userId, 'Google', obj.email, obj.oauthToken);
+            me.loginBysoc(obj.userId, 'Google', obj.email, obj.oauthToken);
         }, function(msg) {
             alert('error: ' + msg);
         });
