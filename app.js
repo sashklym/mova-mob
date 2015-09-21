@@ -58577,6 +58577,7 @@ Ext.define('App.util.Sync', {
     syncQueue: function(successCb, errorCb) {},
     getStoreMaxId: function(store) {
         var maxId = 0;
+        store.clearFilter();
         store.each(function(item, index, length) {
             var id = Number(item.get('id'));
             if (id > maxId) {
@@ -58685,6 +58686,7 @@ Ext.define('App.view.DataList', {
         data: null,
         dataId: null,
         records: null,
+        cacheableField: null,
         baseCls: 'x-datalist',
         emptyText: 'Empty',
         loadingText: 'Loading...',
@@ -58698,25 +58700,64 @@ Ext.define('App.view.DataList', {
     },
     applyData: function(data) {
         //console.log('apply data');
-        if (Ext.isEmpty(data) || Ext.isEmpty(data.items)) {
-            this.setRecords(null);
-            this.showEmptyText();
+        var items = data && data.items,
+            extra = (data && data.extra) || {};
+        if (data.mode == 'overwrite') {
             return data;
         }
-        //console.log(data.items);
-        if (Ext.isEmpty(data.items)) {
+        if (Ext.isEmpty(items)) {
             this.setRecords(null);
             this.showEmptyText();
-        } else {
-            this.setRecords(data.items);
-            this.hideEmptyText();
-            var scroller = this.getScrollable().getScroller();
-            scroller.scrollToTop();
+            return null;
+        }
+        //console.log(items);
+        var scroller = this.getScrollable().getScroller();
+        scroller.scrollToTop();
+        this.setRecords(items);
+        this.hideEmptyText();
+        var cacheableField = this.getCacheableField();
+        if (cacheableField) {
+            this.checkFieldCache(cacheableField, items);
         }
         return {
-            items: data.items,
-            extra: data.extra || {}
+            items: items,
+            extra: extra
         };
+    },
+    checkFieldCache: function(field, items, start) {
+        var me = this,
+            filed;
+        Ext.Array.each(items, function(item, index) {
+            //console.log(item);
+            if (index < start)  {
+                return;
+            }
+
+            if (item.data[field] && !item.data[field + 'Cache']) {
+                var imageSrc = App.config.Main.getImageUrl() + item.data[field];
+                // Download and save image localy
+                App.util.Sync.downloadFile(imageSrc, function(src) {
+                    //console.log(src);
+                    item.set(field + 'Cache', src);
+                    items[index].data[field + 'Cache'] = src;
+                    if (index < items.length) {
+                        items = me.checkFieldCache(field, items, index++);
+                    }
+                }, function(error) {
+                    console.error(error);
+                    if (index < items.length) {
+                        items = me.checkFieldCache(field, items, index++);
+                    }
+                });
+                return false;
+            }
+        });
+        var data = this.getData() || {};
+        this.setData({
+            items: items,
+            extra: data.extra,
+            mode: 'overwrite'
+        });
     },
     onItemTap: function(e) {
         //console.log('tap');
@@ -59352,7 +59393,8 @@ Ext.define('App.model.Category', {
         fields: [
             'id',
             'title',
-            'image'
+            'image',
+            'imageCache'
         ]
     }
 });
@@ -59386,7 +59428,8 @@ Ext.define('App.view.library.Library', {
             {
                 xtype: 'datalist',
                 ui: 'categories',
-                tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image:url(http://ukr-mova.in.ua/{data.image})"></div>', '<div class="name">{data.title}</div>', '</div>', '</tpl>')
+                cacheableField: 'image',
+                tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image:url({data.imageCache})"></div>', '<div class="name">{data.title}</div>', '</div>', '</tpl>')
             }
         ]
     }
@@ -59421,7 +59464,8 @@ Ext.define('App.view.library.Examples', {
             {
                 xtype: 'datalist',
                 ui: 'examples',
-                tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item">', '<div class="image" style="background-image: url(http://ukr-mova.in.ua/{data.thumb})">', '{% if (parent.extra.favorite) { %}', '<div class="icon-remove">X</div>', '{% } %}', '</div>', '</div>', '</tpl>')
+                cacheableField: 'thumb',
+                tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item">', '<div class="image" style="background-image: url({data.thumbCache})">', '{% if (parent.extra.favorite) { %}', '<div class="icon-remove">X</div>', '{% } %}', '</div>', '</div>', '</tpl>')
             }
         ]
     }
