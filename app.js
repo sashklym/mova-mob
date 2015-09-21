@@ -59192,6 +59192,7 @@ Ext.define('App.controller.Login', {
     },
     onFbbuttonButtonButton: function(button) {
         console.log('FB button');
+        var me = this;
         var fbLoginSuccess = function(userData) {
                 //alert("UserInfo: " + JSON.stringify(userData));
                 if (userData.status === "connected") {
@@ -59206,6 +59207,7 @@ Ext.define('App.controller.Login', {
     },
     onGbuttonButtonButton: function(button) {
         console.log('Google button');
+        var me = this;
         window.plugins.googleplus.login({}, function(obj) {
             //alert(obj.email); // do something useful instead of alerting
             me.loginBysoc(obj.userId, 'Google', obj.email, obj.oauthToken);
