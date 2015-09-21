@@ -59210,8 +59210,7 @@ Ext.define('App.controller.Login', {
     onGbuttonButtonButton: function(button) {
         console.log('Google button');
         window.plugins.googleplus.login({}, function(obj) {
-            alert(JSON.stringify(obj));
-            // do something useful instead of alerting
+            //alert(obj.email); // do something useful instead of alerting
             me.loginBysoc(obj.userId, 'Google', obj.email, obj.oauthToken);
         }, function(msg) {
             alert('error: ' + msg);
@@ -59231,7 +59230,7 @@ Ext.define('App.controller.Login', {
             success: function(response) {
                 //console.log(response);
                 var result = Ext.JSON.decode(response.responseText, true);
-                console.log(result);
+                //console.log(result);
                 alert(result.email);
                 if (result && result.id) {
                     usersStore.removeAll();
