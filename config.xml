@@ -82,7 +82,7 @@
     <gap:plugin name="cordova-plugin-statusbar" source="npm" />
     <gap:plugin name="cordova-plugin-file" source="npm" />
     <gap:plugin name="cordova-plugin-file-transfer" source="npm" />
-    <gap:plugin name="cordova-plugin-whitelist" source="npm" />
+<!--    <gap:plugin name="cordova-plugin-whitelist" source="npm" />-->
 
     <!-- Third party plugins -->
     <gap:plugin name="com.phonegap.plugins.facebookconnect" version="0.9.0">
