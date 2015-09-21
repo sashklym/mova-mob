@@ -3,7 +3,7 @@
         xmlns:gap   = "http://phonegap.com/ns/1.0"
         id          = "ukr.mova"
 		versionCode = "1"
-        version     = "0.1.0">
+        version     = "0.1.0.2">
 
     <name>Mova</name>
 
@@ -85,7 +85,7 @@
     <gap:plugin name="cordova-plugin-whitelist" source="npm" />
 
     <!-- Third party plugins -->
-    <gap:plugin name="cordova-plugin-facebookconnect-orlando" source="npm">
+    <gap:plugin name="com.phonegap.plugins.facebookconnect" version="0.9.0">
         <param name="APP_ID" value="391185391051135" />
         <param name="APP_NAME" value="ukr-mova.in.ua" />
     </gap:plugin>
@@ -93,8 +93,6 @@
     <gap:plugin name="cordova-plugin-googleplus" source="npm">
       <param name="REVERSED_CLIENT_ID" value="com.googleusercontent.apps.73453093308-ikfohjlm89d14vssj0ukrpol5ttvcjhk" />
     </gap:plugin>
-
-<!--    <gap:plugin name="com.andycorman.cordova.inappbrowser" version="1.2" />-->
 
     <!--
         Icon
@@ -145,10 +143,10 @@
         Splashscreen
     -->
     <!-- Android -->
-    <gap:splash src="resources/splash/android/screen-portrait-ldpi.png"  gap:platform="android" gap:qualifier="port-ldpi" />
-    <gap:splash src="resources/splash/android/screen-portrait-mdpi.png"  gap:platform="android" gap:qualifier="port-mdpi" />
-    <gap:splash src="resources/splash/android/screen-portrait-hdpi.png"  gap:platform="android" gap:qualifier="port-hdpi" />
-    <gap:splash src="resources/splash/android/screen-portrait-xhdpi.png" gap:platform="android" gap:qualifier="port-xhdpi" />
+    <gap:splash src="resources/splash/android/splash-port-ldpi.png"  gap:platform="android" gap:qualifier="port-ldpi" />
+    <gap:splash src="resources/splash/android/splash-port-mdpi.png"  gap:platform="android" gap:qualifier="port-mdpi" />
+    <gap:splash src="resources/splash/android/splash-port-hdpi.png"  gap:platform="android" gap:qualifier="port-hdpi" />
+    <gap:splash src="resources/splash/android/splash-port-xhdpi.png" gap:platform="android" gap:qualifier="port-xhdpi" />
 
     <!-- iPhone 6 Plus and iPhone 6 -->
     <gap:splash src="resources/splash/ios/Default-667h@2x~iphone.png" gap:platform="ios" width="750" height="1334" />

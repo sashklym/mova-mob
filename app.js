@@ -58716,9 +58716,9 @@ Ext.define('App.controller.Main', {
                 autoCreate: true
             },
             leftMenuButton: 'leftmenu button',
-            toggleLeftMenuButton: 'titlebar button[action=leftmenu]',
-            homeButton: 'titlebar button[action=home]',
-            backButton: 'titlebar button[action=back]'
+            toggleLeftMenuButton: 'titlebar button[ui=menu]',
+            homeButton: 'titlebar button[ui=home]',
+            backButton: 'titlebar button[ui=back]'
         },
         control: {
             toggleLeftMenuButton: {
@@ -58861,6 +58861,7 @@ Ext.define('App.controller.Main', {
         //console.log('tap left menu button');
         var action = button.getInitialConfig().action;
         //console.log(action);
+        Ext.Viewport.getLayout().setAnimation(false);
         // Go to page specified in action param
         this.redirectTo(action);
         // Hide Left Menu
@@ -58868,10 +58869,18 @@ Ext.define('App.controller.Main', {
     },
     onHomeButton: function(button) {
         //console.log('tap home');
+        Ext.Viewport.getLayout().setAnimation({
+            type: 'slide',
+            direction: 'right'
+        });
         this.redirectTo('home');
     },
     onBackButton: function(button) {
         //console.log('tap back');
+        Ext.Viewport.getLayout().setAnimation({
+            type: 'slide',
+            direction: 'right'
+        });
         history.back();
         return false;
     }
@@ -59136,10 +59145,9 @@ Ext.define('App.view.Home', {
                 title: '',
                 items: [
                     {
-                        xtype: 'button',
-                        iconCls: 'menu',
                         align: 'left',
-                        action: 'leftmenu'
+                        iconCls: 'menu',
+                        ui: 'menu'
                     },
                     {
                         xtype: 'label',
@@ -59208,29 +59216,26 @@ Ext.define('App.controller.Home', {
     },
     showHome: function() {
         console.log('show home');
-        //        var homeView = this.getHomeView();
-        //
-        //        Ext.Viewport.setActiveItem(homeView);
-        homeView = this.getHomeView() || Ext.create('App.view.Home');
-        Ext.Viewport.animateActiveItem(homeView, {
-            type: 'slide',
-            direction: 'left'
-        });
-        var user = Ext.getStore('Users').getAt(0);
-        if (user && user.get('name') && user.get('sessionid')) {}
-        //this.redirectTo('home');
+        var homeView = this.getHomeView();
+        Ext.Viewport.setActiveItem(homeView);
         App.util.Sync.syncAll(function() {
             console.log('sync all');
         });
     },
     onLibraryButton: function() {
         console.log('tap library');
-        // Go to Library
+        Ext.Viewport.getLayout().setAnimation({
+            type: 'slide',
+            direction: 'left'
+        });
         this.redirectTo('library');
     },
     onTreningButton: function() {
         console.log('tap trening');
-        // Go to Library
+        Ext.Viewport.getLayout().setAnimation({
+            type: 'slide',
+            direction: 'left'
+        });
         this.redirectTo('trening');
     }
 });
@@ -59262,6 +59267,282 @@ Ext.define('App.model.Category', {
             'id',
             'title',
             'image'
+        ]
+    }
+});
+
+Ext.define('App.view.CategoriesList', {
+    extend: 'Ext.Container',
+    xtype: 'categorieslist',
+    config: {
+        scrollable: 'vertical',
+        store: 'Categories',
+        loadingText: 'Загрузка...',
+        emptyText: 'Товаров не найдено',
+        cls: 'x-categorieslist',
+        tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image:url({data.image:this.getUrl});{imageCss}><img src="{data.image:this.getUrl}" /></div>', '<div class="name">{data.title}</div>', '</div>', '</tpl>', {
+            getUrl: function(name) {
+                return App.config.Main.getImageUrl() + name;
+            }
+        })
+    },
+    //    storeEventHooks: {
+    //        beforeload: 'onBeforeLoad',
+    //        load: 'onLoad'
+    //    },
+    initialize: function() {
+        this.callParent();
+        //var scroller = this.getScrollable().getScroller();
+        //scroller.on('scrollend', 'onScrollEnd', this);
+        this.element.on('tap', 'onTap', this);
+    },
+    onTap: function(e) {
+        //console.log('tap');
+        var element = Ext.get(e.target),
+            fireEvent, id;
+        if (element.hasCls('item') || element.parent('.item')) {
+            fireEvent = 'itemtap';
+        }
+        if (!element.hasCls('item')) {
+            element = element.parent('.item');
+        }
+        id = element.getAttribute('ref');
+        if (fireEvent) {
+            this.fireEvent(fireEvent, this, id, element);
+        }
+    }
+});
+//    onScrollEnd: function(scroller, x, y) {
+//        if (y >= scroller.maxPosition.y && this.storeFullyLoaded()) {
+//            this.getStore().nextPage({ addRecords: true });
+//        }
+//    },
+//
+//    refresh: function() {
+//        var store = this.getStore(),
+//            data = store.getData(),
+//            scroller = this.getScrollable().getScroller();
+//
+//        //console.log('refresh');
+//
+//        if(store.currentPage == 1) {
+//            scroller.scrollTo(0, 0);
+//        }
+//
+//        // Set data
+//        this.setData({
+//            extra: this.getExtraData(),
+//            items: data.items
+//        });
+//
+//    },
+//
+//    onBeforeLoad: function() {
+//        var loadingText = this.getLoadingText();
+//        if (loadingText && this.isPainted()) {
+//            if(Ext.os.is.Android) {
+//                //Ext.getCmp('loading').show();
+//            } else {
+//                this.setMasked({
+//                    xtype: 'loadmask',
+//                    message: loadingText
+//                });
+//            }
+//        }
+//
+//        this.hideEmptyText();
+//    },
+//
+//    onLoad: function(store, records, successful) {
+//        console.log('load store productslist');
+//        //remove any masks on the store
+//        this.hasLoadedStore = true;
+//        this.setMasked(false);
+//        Ext.getCmp('loading').hide();
+//
+//        // Remove buttons
+//        this.remove(this.btnLoadNext);
+//        this.remove(this.btnLoadPrevious);
+//
+//        if (!store.getCount()) {
+//            this.showEmptyText();
+//            return;
+//        }
+//
+//        if(!successful) {
+//            return;
+//        }
+//
+//        this.refresh();
+//
+//        var sectionsStore = Ext.getStore('Sections'),
+//            nextSection = null,
+//            previousSection = null,
+//            proxy = store.getProxy(),
+//            params = (store.getStoreId() != 'Cart') && proxy.getExtraParams();
+//
+//        if(params && params.category && params.category != 'search') {
+//            previousSection = sectionsStore.findPreviousChild('alias', params.category);
+//            nextSection = sectionsStore.findNextChild('alias', params.category);
+//        }
+//
+//        if(previousSection) {
+//            this.btnLoadPrevious = this.insert(0, {
+//                xtype: 'button',
+//                ui: 'action',
+//                text: '<<< ' + previousSection.get('name'),
+//                style: 'width: 230px; margin: .5em auto 0 auto;',
+//                handler: function(){
+//                    //console.log('tap load next');
+//                    window.location.hash = 'products/' + previousSection.get('alias');
+//                }
+//            });
+//        }
+//
+//        if(nextSection) {
+//            this.btnLoadNext = this.add({
+//                xtype: 'button',
+//                ui: 'action',
+//                text: nextSection.get('name') + ' >>>',
+//                style: 'width: 230px; margin: 0 auto;',
+//                handler: function(){
+//                    //console.log('tap load next');
+//                    window.location.hash = 'products/' + nextSection.get('alias');
+//                }
+//            });
+//        }
+//
+////        this.remove(this.btnLoadNext);
+////        // Add NEXT button
+////        if(records.length >= store.getPageSize()) {
+////            this.btnLoadNext = this.add({
+////                xtype: 'button',
+////                ui: 'action',
+////                text: 'Дальше',
+////                style: 'width: 100px; margin: 0 auto;',
+////                handler: function(){
+////                    //console.log('tap load next');
+////                    store.nextPage({ addRecords: true });
+////                }
+////            });
+////        }
+//    },
+//
+//    btnLoadNext: null,
+//    btnLoadPrevious: null,
+//
+//    /**
+//     * Method called when the Store's Reader throws an exception
+//     * @method handleException
+//     */
+//    handleException: function() {
+//        this.setMasked(false);
+//        Ext.getCmp('loading').hide();
+//    },
+//
+//    updateEmptyText: function(newEmptyText, oldEmptyText) {
+//        var me = this,
+//            store;
+//
+//        if (oldEmptyText && me.emptyTextCmp) {
+//            me.remove(me.emptyTextCmp, true);
+//            delete me.emptyTextCmp;
+//        }
+//
+//        if (newEmptyText) {
+//            me.emptyTextCmp = me.add({
+//                xtype: 'component',
+//                cls: 'emptytext',
+//                html: newEmptyText,
+//                hidden: true
+//            });
+//            store = me.getStore();
+//            if (store && me.hasLoadedStore && !store.getCount()) {
+//                this.showEmptyText();
+//            }
+//        }
+//    },
+//
+//    showEmptyText: function() {
+//        if (this.getEmptyText()) {
+//            this.emptyTextCmp.show();
+//        }
+//        this.setData(null);
+//    },
+//
+//    hideEmptyText: function() {
+//        if (this.getEmptyText()) {
+//            this.emptyTextCmp.hide();
+//        }
+//    },
+//
+//    applyStore: function(store) {
+//        var me = this,
+//            bindEvents = Ext.apply({}, me.storeEventHooks, { scope: me }),
+//            proxy, reader;
+//
+//        if (store) {
+//            store = Ext.data.StoreManager.lookup(store);
+//            if (store && Ext.isObject(store) && store.isStore) {
+//                store.on(bindEvents);
+//                proxy = store.getProxy();
+//                if (proxy) {
+//                    reader = proxy.getReader();
+//                    if (reader) {
+//                        reader.on('exception', 'handleException', this);
+//                    }
+//                }
+//            }
+//            //<debug warn>
+//            else {
+//                Ext.Logger.warn("The specified Store cannot be found", this);
+//            }
+//            //</debug>
+//        }
+//
+//        return store;
+//    },
+//
+//    storeFullyLoaded: function() {
+//        var store = this.getStore(),
+//            loaded = store.getCount(),
+//            total = store.getTotalCount();
+//        if(total) {
+//            return total <= (store.currentPage * store.getPageSize());
+//        }
+//
+//        return loaded == (store.currentPage * store.getPageSize());
+//    }
+
+Ext.define('App.view.Library', {
+    extend: 'Ext.Container',
+    xtype: 'library',
+    config: {
+        fullscreen: true,
+        cls: 'x-view-library',
+        layout: 'fit',
+        items: [
+            {
+                xtype: 'titlebar',
+                docked: 'top',
+                ui: 'main',
+                title: 'Бібліотека',
+                items: [
+                    {
+                        align: 'left',
+                        iconCls: 'menu',
+                        ui: 'menu'
+                    },
+                    {
+                        align: 'right',
+                        iconCls: 'home',
+                        ui: 'home'
+                    }
+                ]
+            },
+            {
+                xtype: 'categorieslist'
+            }
         ]
     }
 });
@@ -59530,295 +59811,19 @@ Ext.define('App.view.Examples', {
                 title: 'Приклади',
                 items: [
                     {
-                        iconCls: 'back',
                         align: 'left',
-                        action: 'back'
+                        iconCls: 'back',
+                        ui: 'back'
                     },
                     {
-                        iconCls: 'home',
                         align: 'right',
-                        action: 'home'
+                        iconCls: 'home',
+                        ui: 'home'
                     }
                 ]
             },
             {
                 xtype: 'exampleslist'
-            }
-        ]
-    }
-});
-
-Ext.define('App.view.CategoriesList', {
-    extend: 'Ext.Container',
-    xtype: 'categorieslist',
-    config: {
-        scrollable: 'vertical',
-        store: 'Categories',
-        loadingText: 'Загрузка...',
-        emptyText: 'Товаров не найдено',
-        cls: 'x-categorieslist',
-        tpl: new Ext.XTemplate('<tpl for="items">', '<div class="item" ref="{data.id}">', '<div class="image" style="background-image:url({data.image:this.getUrl});{imageCss}><img src="{data.image:this.getUrl}" /></div>', '<div class="name">{data.title}</div>', '</div>', '</tpl>', {
-            getUrl: function(name) {
-                return App.config.Main.getImageUrl() + name;
-            }
-        })
-    },
-    //    storeEventHooks: {
-    //        beforeload: 'onBeforeLoad',
-    //        load: 'onLoad'
-    //    },
-    initialize: function() {
-        this.callParent();
-        //var scroller = this.getScrollable().getScroller();
-        //scroller.on('scrollend', 'onScrollEnd', this);
-        this.element.on('tap', 'onTap', this);
-    },
-    onTap: function(e) {
-        //console.log('tap');
-        var element = Ext.get(e.target),
-            fireEvent, id;
-        if (element.hasCls('item') || element.parent('.item')) {
-            fireEvent = 'itemtap';
-        }
-        if (!element.hasCls('item')) {
-            element = element.parent('.item');
-        }
-        id = element.getAttribute('ref');
-        if (fireEvent) {
-            this.fireEvent(fireEvent, this, id, element);
-        }
-    }
-});
-//    onScrollEnd: function(scroller, x, y) {
-//        if (y >= scroller.maxPosition.y && this.storeFullyLoaded()) {
-//            this.getStore().nextPage({ addRecords: true });
-//        }
-//    },
-//
-//    refresh: function() {
-//        var store = this.getStore(),
-//            data = store.getData(),
-//            scroller = this.getScrollable().getScroller();
-//
-//        //console.log('refresh');
-//
-//        if(store.currentPage == 1) {
-//            scroller.scrollTo(0, 0);
-//        }
-//
-//        // Set data
-//        this.setData({
-//            extra: this.getExtraData(),
-//            items: data.items
-//        });
-//
-//    },
-//
-//    onBeforeLoad: function() {
-//        var loadingText = this.getLoadingText();
-//        if (loadingText && this.isPainted()) {
-//            if(Ext.os.is.Android) {
-//                //Ext.getCmp('loading').show();
-//            } else {
-//                this.setMasked({
-//                    xtype: 'loadmask',
-//                    message: loadingText
-//                });
-//            }
-//        }
-//
-//        this.hideEmptyText();
-//    },
-//
-//    onLoad: function(store, records, successful) {
-//        console.log('load store productslist');
-//        //remove any masks on the store
-//        this.hasLoadedStore = true;
-//        this.setMasked(false);
-//        Ext.getCmp('loading').hide();
-//
-//        // Remove buttons
-//        this.remove(this.btnLoadNext);
-//        this.remove(this.btnLoadPrevious);
-//
-//        if (!store.getCount()) {
-//            this.showEmptyText();
-//            return;
-//        }
-//
-//        if(!successful) {
-//            return;
-//        }
-//
-//        this.refresh();
-//
-//        var sectionsStore = Ext.getStore('Sections'),
-//            nextSection = null,
-//            previousSection = null,
-//            proxy = store.getProxy(),
-//            params = (store.getStoreId() != 'Cart') && proxy.getExtraParams();
-//
-//        if(params && params.category && params.category != 'search') {
-//            previousSection = sectionsStore.findPreviousChild('alias', params.category);
-//            nextSection = sectionsStore.findNextChild('alias', params.category);
-//        }
-//
-//        if(previousSection) {
-//            this.btnLoadPrevious = this.insert(0, {
-//                xtype: 'button',
-//                ui: 'action',
-//                text: '<<< ' + previousSection.get('name'),
-//                style: 'width: 230px; margin: .5em auto 0 auto;',
-//                handler: function(){
-//                    //console.log('tap load next');
-//                    window.location.hash = 'products/' + previousSection.get('alias');
-//                }
-//            });
-//        }
-//
-//        if(nextSection) {
-//            this.btnLoadNext = this.add({
-//                xtype: 'button',
-//                ui: 'action',
-//                text: nextSection.get('name') + ' >>>',
-//                style: 'width: 230px; margin: 0 auto;',
-//                handler: function(){
-//                    //console.log('tap load next');
-//                    window.location.hash = 'products/' + nextSection.get('alias');
-//                }
-//            });
-//        }
-//
-////        this.remove(this.btnLoadNext);
-////        // Add NEXT button
-////        if(records.length >= store.getPageSize()) {
-////            this.btnLoadNext = this.add({
-////                xtype: 'button',
-////                ui: 'action',
-////                text: 'Дальше',
-////                style: 'width: 100px; margin: 0 auto;',
-////                handler: function(){
-////                    //console.log('tap load next');
-////                    store.nextPage({ addRecords: true });
-////                }
-////            });
-////        }
-//    },
-//
-//    btnLoadNext: null,
-//    btnLoadPrevious: null,
-//
-//    /**
-//     * Method called when the Store's Reader throws an exception
-//     * @method handleException
-//     */
-//    handleException: function() {
-//        this.setMasked(false);
-//        Ext.getCmp('loading').hide();
-//    },
-//
-//    updateEmptyText: function(newEmptyText, oldEmptyText) {
-//        var me = this,
-//            store;
-//
-//        if (oldEmptyText && me.emptyTextCmp) {
-//            me.remove(me.emptyTextCmp, true);
-//            delete me.emptyTextCmp;
-//        }
-//
-//        if (newEmptyText) {
-//            me.emptyTextCmp = me.add({
-//                xtype: 'component',
-//                cls: 'emptytext',
-//                html: newEmptyText,
-//                hidden: true
-//            });
-//            store = me.getStore();
-//            if (store && me.hasLoadedStore && !store.getCount()) {
-//                this.showEmptyText();
-//            }
-//        }
-//    },
-//
-//    showEmptyText: function() {
-//        if (this.getEmptyText()) {
-//            this.emptyTextCmp.show();
-//        }
-//        this.setData(null);
-//    },
-//
-//    hideEmptyText: function() {
-//        if (this.getEmptyText()) {
-//            this.emptyTextCmp.hide();
-//        }
-//    },
-//
-//    applyStore: function(store) {
-//        var me = this,
-//            bindEvents = Ext.apply({}, me.storeEventHooks, { scope: me }),
-//            proxy, reader;
-//
-//        if (store) {
-//            store = Ext.data.StoreManager.lookup(store);
-//            if (store && Ext.isObject(store) && store.isStore) {
-//                store.on(bindEvents);
-//                proxy = store.getProxy();
-//                if (proxy) {
-//                    reader = proxy.getReader();
-//                    if (reader) {
-//                        reader.on('exception', 'handleException', this);
-//                    }
-//                }
-//            }
-//            //<debug warn>
-//            else {
-//                Ext.Logger.warn("The specified Store cannot be found", this);
-//            }
-//            //</debug>
-//        }
-//
-//        return store;
-//    },
-//
-//    storeFullyLoaded: function() {
-//        var store = this.getStore(),
-//            loaded = store.getCount(),
-//            total = store.getTotalCount();
-//        if(total) {
-//            return total <= (store.currentPage * store.getPageSize());
-//        }
-//
-//        return loaded == (store.currentPage * store.getPageSize());
-//    }
-
-Ext.define('App.view.Library', {
-    extend: 'Ext.Container',
-    xtype: 'library',
-    config: {
-        fullscreen: true,
-        cls: 'x-view-library',
-        layout: 'fit',
-        items: [
-            {
-                xtype: 'titlebar',
-                docked: 'top',
-                ui: 'main',
-                title: 'Бібліотека',
-                items: [
-                    {
-                        iconCls: 'menu',
-                        align: 'left',
-                        action: 'leftmenu'
-                    },
-                    {
-                        iconCls: 'home',
-                        align: 'right',
-                        action: 'home'
-                    }
-                ]
-            },
-            {
-                xtype: 'categorieslist'
             }
         ]
     }
@@ -59839,14 +59844,14 @@ Ext.define('App.view.Example', {
                 title: 'Приклад',
                 items: [
                     {
-                        iconCls: 'back',
                         align: 'left',
-                        action: 'back'
+                        iconCls: 'back',
+                        ui: 'back'
                     },
                     {
-                        iconCls: 'home',
                         align: 'right',
-                        action: 'home'
+                        iconCls: 'home',
+                        ui: 'home'
                     }
                 ]
             },
@@ -60045,11 +60050,8 @@ Ext.define('App.controller.Library', {
     },
     showLibrary: function() {
         console.log('show library');
-        libraryView = this.getLibraryView() || Ext.create('App.view.Library');
-        Ext.Viewport.animateActiveItem(libraryView, {
-            type: 'slide',
-            direction: 'left'
-        });
+        var libraryView = this.getLibraryView();
+        Ext.Viewport.setActiveItem(libraryView);
         var categotiesStore = Ext.getStore('Categories'),
             categoriesList = this.getCategoriesList();
         categotiesStore.clearFilter();
@@ -60057,22 +60059,26 @@ Ext.define('App.controller.Library', {
     },
     onCategoriesListTap: function(view, id) {
         console.log('tap list item');
+        Ext.Viewport.getLayout().setAnimation({
+            type: 'slide',
+            direction: 'left'
+        });
         this.redirectTo('library/examples/' + id);
     },
     onExamplesListTap: function(view, id) {
         console.log('tap list item');
+        Ext.Viewport.getLayout().setAnimation({
+            type: 'slide',
+            direction: 'left'
+        });
         this.redirectTo('library/example/' + id);
     },
     showExamples: function(category) {
         console.log('show examples category ' + category);
-        examplesView = this.getExamplesView() || Ext.create('App.view.Examples');
-        Ext.Viewport.animateActiveItem(examplesView, {
-            type: 'slide',
-            direction: 'left'
-        });
+        var examplesView = this.getExamplesView();
+        Ext.Viewport.setActiveItem(examplesView);
         var examplesStore = Ext.getStore('Examples'),
-            examplesList = this.getExamplesList(),
-            exampleView = this.getExampleView() || Ext.create('App.view.Examples');
+            examplesList = this.getExamplesList();
         examplesStore.clearFilter();
         examplesStore.filterBy(function(record) {
             return Number(record.get('category')) == Number(category);
@@ -60081,7 +60087,7 @@ Ext.define('App.controller.Library', {
     },
     showExample: function(id) {
         console.log('show example id ' + id);
-        var exampleView = this.getExampleView() || Ext.create('App.view.Examples'),
+        var exampleView = this.getExampleView(),
             examplesCarousel = this.getExamplesCarousel(),
             examplesStore = Ext.getStore('Examples'),
             data = examplesStore.getData(),
@@ -60170,16 +60176,14 @@ Ext.define('App.view.Favorite', {
                 title: 'Вибране',
                 items: [
                     {
-                        xtype: 'button',
-                        iconCls: 'menu',
                         align: 'left',
-                        action: 'leftmenu'
+                        iconCls: 'menu',
+                        ui: 'menu'
                     },
                     {
-                        xtype: 'button',
-                        iconCls: 'home',
                         align: 'right',
-                        action: 'home'
+                        iconCls: 'home',
+                        ui: 'home'
                     }
                 ]
             },
@@ -60256,110 +60260,6 @@ Ext.define('App.model.Trening', {
             'id',
             'title',
             'image'
-        ]
-    }
-});
-
-Ext.define('App.view.Onetrening', {
-    extend: 'Ext.Container',
-    xtype: 'onetrening',
-    config: {
-        fullscreen: true,
-        cls: 'x-view-onetrening',
-        layout: 'fit',
-        items: [
-            {
-                xtype: 'titlebar',
-                docked: 'top',
-                ui: 'main',
-                title: 'Вправа',
-                items: [
-                    {
-                        iconCls: 'back',
-                        align: 'left',
-                        action: 'back'
-                    },
-                    {
-                        iconCls: 'home',
-                        align: 'right',
-                        action: 'home'
-                    }
-                ]
-            },
-            {
-                xtype: 'container',
-                itemId: 'treningAll',
-                cls: 'links',
-                items: [
-                    {
-                        xtype: 'container',
-                        itemId: 'onetreningcontainer',
-                        tpl: [
-                            '<div class="exercies_one">',
-                            '<div class="quetion">{quetion}</div>',
-                            '<div class="variantu" id="id_variantu">{variantu}</div>',
-                            '</div>'
-                        ].join('')
-                    },
-                    {
-                        xtype: 'button',
-                        itemId: 'answerButton',
-                        ui: 'action',
-                        cls: 'verify',
-                        action: 'verify',
-                        text: 'Відповісти'
-                    },
-                    {
-                        xtype: 'spacer'
-                    },
-                    {
-                        xtype: 'container',
-                        itemId: 'answerRight',
-                        cls: 'answerRight',
-                        items: [
-                            {
-                                xtype: 'button',
-                                ui: 'action',
-                                itemId: 'lebelwrong',
-                                cls: 'wrong',
-                                text: 'Неправильно'
-                            },
-                            {
-                                xtype: 'button',
-                                ui: 'action',
-                                cls: 'right',
-                                itemId: 'lebelright',
-                                text: 'Правильно'
-                            },
-                            {
-                                xtype: 'button',
-                                ui: 'action',
-                                action: 'next',
-                                cls: 'next',
-                                text: 'Далі'
-                            }
-                        ]
-                    },
-                    {
-                        xtype: 'container',
-                        itemId: 'showResult',
-                        cls: 'showResult',
-                        tpl: [
-                            '<div class="">',
-                            '<div class="img">{img_lepetun}</div>',
-                            '<div class="info">',
-                            '<h1>{text}</h1>',
-                            '<h2>Ваш результат:</h2>',
-                            '<h3>{result}</h3>',
-                            '</div>',
-                            '</div>'
-                        ].join('')
-                    },
-                    {
-                        xtype: 'spacer'
-                    }
-                ]
-            }
         ]
     }
 });
@@ -60623,21 +60523,123 @@ Ext.define('App.view.Trening', {
                 title: 'Вправи',
                 items: [
                     {
-                        xtype: 'button',
-                        iconCls: 'menu',
                         align: 'left',
-                        action: 'leftmenu'
+                        iconCls: 'menu',
+                        ui: 'menu'
                     },
                     {
-                        xtype: 'button',
-                        iconCls: 'home',
                         align: 'right',
-                        action: 'home'
+                        iconCls: 'home',
+                        ui: 'home'
                     }
                 ]
             },
             {
                 xtype: 'treningslist'
+            }
+        ]
+    }
+});
+
+Ext.define('App.view.Onetrening', {
+    extend: 'Ext.Container',
+    xtype: 'onetrening',
+    config: {
+        fullscreen: true,
+        cls: 'x-view-onetrening',
+        layout: 'fit',
+        items: [
+            {
+                xtype: 'titlebar',
+                docked: 'top',
+                ui: 'main',
+                title: 'Вправа',
+                items: [
+                    {
+                        align: 'left',
+                        iconCls: 'back',
+                        ui: 'back'
+                    },
+                    {
+                        align: 'right',
+                        iconCls: 'home',
+                        ui: 'home'
+                    }
+                ]
+            },
+            {
+                xtype: 'container',
+                itemId: 'treningAll',
+                cls: 'links',
+                items: [
+                    {
+                        xtype: 'container',
+                        itemId: 'onetreningcontainer',
+                        tpl: [
+                            '<div class="exercies_one">',
+                            '<div class="quetion">{quetion}</div>',
+                            '<div class="variantu" id="id_variantu">{variantu}</div>',
+                            '</div>'
+                        ].join('')
+                    },
+                    {
+                        xtype: 'button',
+                        itemId: 'answerButton',
+                        ui: 'action',
+                        cls: 'verify',
+                        action: 'verify',
+                        text: 'Відповісти'
+                    },
+                    {
+                        xtype: 'spacer'
+                    },
+                    {
+                        xtype: 'container',
+                        itemId: 'answerRight',
+                        cls: 'answerRight',
+                        items: [
+                            {
+                                xtype: 'button',
+                                ui: 'action',
+                                itemId: 'lebelwrong',
+                                cls: 'wrong',
+                                text: 'Неправильно'
+                            },
+                            {
+                                xtype: 'button',
+                                ui: 'action',
+                                cls: 'right',
+                                itemId: 'lebelright',
+                                text: 'Правильно'
+                            },
+                            {
+                                xtype: 'button',
+                                ui: 'action',
+                                action: 'next',
+                                cls: 'next',
+                                text: 'Далі'
+                            }
+                        ]
+                    },
+                    {
+                        xtype: 'container',
+                        itemId: 'showResult',
+                        cls: 'showResult',
+                        tpl: [
+                            '<div class="">',
+                            '<div class="img">{img_lepetun}</div>',
+                            '<div class="info">',
+                            '<h1>{text}</h1>',
+                            '<h2>Ваш результат:</h2>',
+                            '<h3>{result}</h3>',
+                            '</div>',
+                            '</div>'
+                        ].join('')
+                    },
+                    {
+                        xtype: 'spacer'
+                    }
+                ]
             }
         ]
     }
@@ -60711,14 +60713,8 @@ Ext.define('App.controller.Trening', {
     },
     showTrening: function() {
         console.log('show trening');
-        //        var treningView = this.getTreningView();
-        //
-        //        Ext.Viewport.setActiveItem(treningView);
-        treningView = this.getTreningView() || Ext.create('App.view.Trening');
-        Ext.Viewport.animateActiveItem(treningView, {
-            type: 'slide',
-            direction: 'left'
-        });
+        var treningView = this.getTreningView();
+        Ext.Viewport.setActiveItem(treningView);
         var treningsStore = Ext.getStore('Trenings'),
             treningsList = this.getTreningsList();
         treningsStore.getProxy().setExtraParams({});
@@ -60750,11 +60746,8 @@ Ext.define('App.controller.Trening', {
     },
     showOnetrening: function(id) {
         console.log('show trening ' + id);
-        onetreningView = this.getOnetreningView() || Ext.create('App.view.Onetrening');
-        Ext.Viewport.animateActiveItem(onetreningView, {
-            type: 'slide',
-            direction: 'left'
-        });
+        var onetreningView = this.getOnetreningView();
+        Ext.Viewport.setActiveItem(onetreningView);
         exersice = {
             // ************* ini arrs with data for trening *************
             num: [],
@@ -60806,11 +60799,13 @@ Ext.define('App.controller.Trening', {
                                 }
                                 exersice.show_now_quetions(0);
                             } else {
+                                Ext.Viewport.getLayout().setAnimation(false);
                                 this.redirectTo('login');
                             }
                         }
                     });
                 } else {
+                    Ext.Viewport.getLayout().setAnimation(false);
                     this.redirectTo('login');
                 }
             },
@@ -60896,6 +60891,7 @@ Ext.define('App.controller.Trening', {
     },
     onTreningsListTap: function(view, id) {
         //console.info('trening/'+ id);
+        Ext.Viewport.getLayout().setAnimation(false);
         this.redirectTo('trening/' + id);
     }
 });
@@ -60914,16 +60910,14 @@ Ext.define('App.view.Settings', {
                 title: 'Налаштування',
                 items: [
                     {
-                        xtype: 'button',
-                        iconCls: 'menu',
                         align: 'left',
-                        action: 'leftmenu'
+                        iconCls: 'menu',
+                        ui: 'menu'
                     },
                     {
-                        xtype: 'button',
-                        iconCls: 'home',
                         align: 'right',
-                        action: 'home'
+                        iconCls: 'home',
+                        ui: 'home'
                     }
                 ]
             }
@@ -60973,16 +60967,14 @@ Ext.define('App.view.About', {
                 title: 'Про нас',
                 items: [
                     {
-                        xtype: 'button',
-                        iconCls: 'menu',
                         align: 'left',
-                        action: 'leftmenu'
+                        iconCls: 'menu',
+                        ui: 'menu'
                     },
                     {
-                        xtype: 'button',
-                        iconCls: 'home',
                         align: 'right',
-                        action: 'home'
+                        iconCls: 'home',
+                        ui: 'home'
                     }
                 ]
             },
