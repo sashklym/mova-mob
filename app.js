@@ -59154,30 +59154,6 @@ Ext.define('App.controller.Login', {
         var me = this,
             usersStore = Ext.getStore('Users'),
             user;
-        function loginBysoc(id, provider, email, accessToken) {
-            Ext.Ajax.request({
-                method: 'POST',
-                url: App.config.Main.getApiUrl() + 'loginBysoc',
-                params: {
-                    id_user: id,
-                    provider: provider,
-                    email: email,
-                    accessToken: accessToken
-                },
-                withCredentials: false,
-                success: function(response) {
-                    //console.log(response);
-                    var result = Ext.JSON.decode(response.responseText, true);
-                    console.log(result);
-                    if (result && result.id) {
-                        usersStore.removeAll();
-                        user = usersStore.add(result)[0];
-                        me.redirectTo('home');
-                    }
-                }
-            });
-        }
-
         var fbLoginSuccess = function(userData) {
                 //alert("UserInfo: " + JSON.stringify(userData));
                 if (userData.status === "connected") {
@@ -59194,9 +59170,34 @@ Ext.define('App.controller.Login', {
         console.log('Google button');
         window.plugins.googleplus.login({}, function(obj) {
             alert(JSON.stringify(obj));
-        }, // do something useful instead of alerting
-        function(msg) {
+            // do something useful instead of alerting
+            loginBysoc(obj.userId, 'Google', obj.email, obj.oauthToken);
+        }, function(msg) {
             alert('error: ' + msg);
+        });
+    },
+    loginBysoc: function(id, provider, email, accessToken) {
+        Ext.Ajax.request({
+            method: 'POST',
+            url: App.config.Main.getApiUrl() + 'loginBysoc',
+            params: {
+                id_user: id,
+                provider: provider,
+                email: email,
+                accessToken: accessToken
+            },
+            withCredentials: false,
+            success: function(response) {
+                //console.log(response);
+                var result = Ext.JSON.decode(response.responseText, true);
+                console.log(result);
+                alert(result);
+                if (result && result.id) {
+                    usersStore.removeAll();
+                    user = usersStore.add(result)[0];
+                    me.redirectTo('home');
+                }
+            }
         });
     },
     onRegButton: function(button) {
