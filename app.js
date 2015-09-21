@@ -59232,7 +59232,7 @@ Ext.define('App.controller.Login', {
                 //console.log(response);
                 var result = Ext.JSON.decode(response.responseText, true);
                 console.log(result);
-                alert(result);
+                alert(result.email);
                 if (result && result.id) {
                     usersStore.removeAll();
                     user = usersStore.add(result)[0];
