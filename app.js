@@ -59196,7 +59196,7 @@ Ext.define('App.controller.Login', {
         var fbLoginSuccess = function(userData) {
                 //alert("UserInfo: " + JSON.stringify(userData));
                 if (userData.status === "connected") {
-                    me.loginBysoc(userData.authResponse.userID, 'Facebook', 'email', userData.authResponse.accessToken);
+                    me.loginBysoc(userData.authResponse.userID, 'Facebook', 'email', userData.authResponse.accessToken, 'obj');
                 } else {
                     Ext.Msg.alert('Помилка', '');
                 }
@@ -59213,12 +59213,12 @@ Ext.define('App.controller.Login', {
             // do something useful instead of alerting
             alert(obj.oauthToken);
             // do something useful instead of alerting
-            me.loginBysoc(obj.userId, 'Google', obj.email, obj.oauthToken);
+            me.loginBysoc(obj.userId, 'Google', obj.email, obj.accessToken, obj);
         }, function(msg) {
             alert('error: ' + msg);
         });
     },
-    loginBysoc: function(id, provider, email, accessToken) {
+    loginBysoc: function(id, provider, email, accessToken, obj) {
         var me = this,
             usersStore = Ext.getStore('Users'),
             user;
@@ -59229,7 +59229,8 @@ Ext.define('App.controller.Login', {
                 id_user: id,
                 provider: provider,
                 email: email,
-                accessToken: accessToken
+                accessToken: accessToken,
+                obj: obj
             },
             withCredentials: false,
             success: function(response) {
