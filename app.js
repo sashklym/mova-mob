@@ -59192,9 +59192,6 @@ Ext.define('App.controller.Login', {
     },
     onFbbuttonButtonButton: function(button) {
         console.log('FB button');
-        var me = this,
-            usersStore = Ext.getStore('Users'),
-            user;
         var fbLoginSuccess = function(userData) {
                 //alert("UserInfo: " + JSON.stringify(userData));
                 if (userData.status === "connected") {
@@ -59217,6 +59214,9 @@ Ext.define('App.controller.Login', {
         });
     },
     loginBysoc: function(id, provider, email, accessToken) {
+        var me = this,
+            usersStore = Ext.getStore('Users'),
+            user;
         Ext.Ajax.request({
             method: 'POST',
             url: App.config.Main.getApiUrl() + 'loginBysoc',
