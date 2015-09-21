@@ -59209,7 +59209,10 @@ Ext.define('App.controller.Login', {
         console.log('Google button');
         var me = this;
         window.plugins.googleplus.login({}, function(obj) {
-            //alert(obj.email); // do something useful instead of alerting
+            alert(JSON.stringify(obj));
+            // do something useful instead of alerting
+            alert(obj.oauthToken);
+            // do something useful instead of alerting
             me.loginBysoc(obj.userId, 'Google', obj.email, obj.oauthToken);
         }, function(msg) {
             alert('error: ' + msg);
