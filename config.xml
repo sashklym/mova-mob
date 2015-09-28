@@ -3,7 +3,7 @@
         xmlns:gap   = "http://phonegap.com/ns/1.0"
         id          = "ukr.mova"
 		versionCode = "1"
-        version     = "0.1.0.2">
+        version     = "0.1.0.6">
 
     <name>Mova</name>
 
@@ -35,7 +35,7 @@
         Preferences
     -->
     <!-- Multi-Platform -->
-    <preference name="phonegap-version"           value="cli-5.1.1" />      <!-- all: current version of PhoneGap -->
+    <preference name="phonegap-version"           value="cli-5.2.0" />      <!-- all: current version of PhoneGap -->
     <preference name="orientation"                value="portrait" />       <!-- all: default means both landscape and portrait are enabled -->
     <preference name="fullscreen"                 value="true" />           <!-- all: hides the status bar at the top of the screen -->
     <preference name="DisallowOverscroll"         value="true" />
@@ -82,7 +82,7 @@
     <gap:plugin name="cordova-plugin-statusbar" source="npm" />
     <gap:plugin name="cordova-plugin-file" source="npm" />
     <gap:plugin name="cordova-plugin-file-transfer" source="npm" />
-    <gap:plugin name="cordova-plugin-whitelist" source="npm" version="1.0.0"/>
+    <gap:plugin name="cordova-plugin-whitelist" source="npm" version="1.0.0" />
 
     <!-- Third party plugins -->
     <gap:plugin name="com.phonegap.plugins.facebookconnect" version="0.9.0">
