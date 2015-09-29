@@ -3,7 +3,7 @@
         xmlns:gap   = "http://phonegap.com/ns/1.0"
         id          = "ukr.mova"
 		versionCode = "1"
-        version     = "0.1.0.6">
+        version     = "0.1.0.7">
 
     <name>Mova</name>
 

@@ -59125,6 +59125,7 @@ Ext.define('App.view.Lepetun', {
         enter: 'left',
         exit: 'left',
         message: null,
+        zIndex: 999,
         showAnimation: {
             type: 'slideIn',
             duration: 250,
@@ -59226,6 +59227,10 @@ Ext.define('App.view.Lepetun', {
                 cls: 'x-lepetun-message',
                 html: message,
                 scrollable: true,
+                modal: {
+                    ui: 'lepetun'
+                },
+                hideOnMaskTap: true,
                 showAnimation: 'fadeIn'
             });
         }
@@ -59237,7 +59242,7 @@ Ext.define('App.view.Lepetun', {
         this.messageCmp && this.messageCmp.hide();
     },
     onTap: function(e) {
-        console.log('tap');
+        //console.log('tap');
         if (this.messageCmp && !this.messageCmp.isHidden()) {
             this.hideMessage();
         } else {
@@ -60462,19 +60467,39 @@ Ext.define('App.view.trening.Test', {
                 defaults: {
                     labelWidth: '80%',
                     labelWrap: true
-                }
+                },
+                hidden: true
             },
             {
                 xtype: 'button',
                 itemId: 'verifyButton',
                 ui: 'action',
-                text: 'Відповісти'
+                text: 'Відповісти',
+                hidden: true
             },
             {
                 xtype: 'button',
                 itemId: 'nextButton',
                 ui: 'action',
-                text: 'Далі'
+                width: 80,
+                text: 'Далі',
+                hidden: true
+            },
+            {
+                xtype: 'panel',
+                itemId: 'resultPanel',
+                ui: 'result',
+                centered: true,
+                showAnimation: 'fadeIn',
+                hidden: true,
+                tpl: [
+                    '<div class="lepetun lepetun-{lepetun}"></div>',
+                    '<div class="box">',
+                    '<div class="title">{title}</div>',
+                    '<div class="text">Ваш результат:</div>',
+                    '<div class="result">{correct} з {total}</div>',
+                    '</div>'
+                ].join('')
             }
         ]
     }
@@ -60521,6 +60546,7 @@ Ext.define('App.controller.Trening', {
             testTitebar: 'test titlebar',
             taskLabel: 'test label',
             taskForm: 'test formpanel',
+            resultPanel: 'test #resultPanel',
             verifyButton: 'test #verifyButton',
             nextButton: 'test #nextButton',
             lepetun: 'lepetun'
@@ -60570,24 +60596,25 @@ Ext.define('App.controller.Trening', {
         this.taskIndex = 0;
         this.correct = 0;
         this.showTestTask(0);
-        var letepun = this.getLepetun();
-        letepun.setTop(300);
     },
     showTestTask: function() {
         var tasks = this.testData.tasks,
             taskIndex = this.taskIndex,
             task = tasks[taskIndex],
-            answers = task.answers.split('|');
-        //console.log(task);
-        var taskLabel = this.getTaskLabel(),
+            answers = task.answers.split('|'),
+            taskLabel = this.getTaskLabel(),
             taskForm = this.getTaskForm(),
             testTitebar = this.getTestTitebar(),
             verifyButton = this.getVerifyButton(),
             nextButton = this.getNextButton();
+        //console.log(task);
+        this.getResultPanel().hide();
         testTitebar.setTitle((taskIndex + 1) + ' / ' + tasks.length);
         taskLabel.setHtml(task.questions);
+        taskLabel.show();
         taskForm.removeAll();
         taskForm.removeCls('answer');
+        taskForm.show();
         Ext.each(answers, function(answer, index) {
             var radiofield = taskForm.add({
                     xtype: 'radiofield',
@@ -60617,12 +60644,15 @@ Ext.define('App.controller.Trening', {
             Ext.Msg.alert('Увага', 'Виберіть один із варіантів');
             return;
         }
+        var buttonXY = button.element.getXY();
+        //console.log(buttonXY);
         button.hide();
         taskForm.getFieldsAsArray().forEach(function(field) {
             //console.log(field);
             field.disable();
         });
         taskForm.addCls('answer');
+        letepun.setTop(buttonXY[1] - 40);
         if (formValues.answer == task.correct) {
             this.correct++;
             letepun.show('ok', task.explanation);
@@ -60639,7 +60669,7 @@ Ext.define('App.controller.Trening', {
         //console.log(taskIndex, tasks.length)
         button.hide();
         letepun.hide();
-        if (taskIndex + 1 >= tasks.length) {
+        if (taskIndex >= tasks.length - 1) {
             this.onTestComplete();
         } else {
             this.taskIndex++;
@@ -60650,11 +60680,34 @@ Ext.define('App.controller.Trening', {
         var tasks = this.testData.tasks,
             taskIndex = this.taskIndex,
             task = tasks[taskIndex],
-            letepun = this.getLepetun();
-        var message = 'Результат: ' + this.correct;
-        setTimeout(function() {
-            letepun.show('explain', message);
-        }, 1000);
+            letepun = this.getLepetun(),
+            resultPanel = this.getResultPanel();
+        if (this.correct == 10) {
+            resultPanel.setData({
+                title: 'Чудово!',
+                correct: 10,
+                total: 10,
+                lepetun: 'happy'
+            });
+        } else if (this.correct >= 6) {
+            resultPanel.setData({
+                title: 'Можна й краще',
+                correct: this.correct,
+                total: 10,
+                lepetun: 'abset'
+            });
+        } else {
+            resultPanel.setData({
+                title: 'Треба вчитись',
+                correct: this.correct,
+                total: 10,
+                lepetun: 'explain'
+            });
+        }
+        this.getTestTitebar().setTitle('Результат');
+        this.getTaskLabel().hide();
+        this.getTaskForm().hide();
+        resultPanel.show();
     }
 });
 
